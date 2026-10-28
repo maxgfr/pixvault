@@ -59,6 +59,36 @@ Every model is open, downloaded once only when you first use its tool, checked a
 
 They run with ONNX Runtime Web on the graphics card when the browser has WebGPU, on the processor otherwise (slower). **Describe and tag** can also use your own AI provider (OpenAI, Anthropic, Google, Mistral, OpenRouter, Groq, xAI, or a local Ollama / LM Studio) through [llm-connect](https://github.com/maxgfr/llm-models): the key is encrypted in your browser, and only the photos you describe are sent, reduced to 1024 px.
 
+## Command line
+
+The same tools and the same engine, in one standalone binary for macOS and Linux:
+
+```bash
+brew install maxgfr/tap/pixvault
+```
+
+Or download `pixvault-<os>-<arch>` from the [latest release](https://github.com/maxgfr/pixvault/releases/latest) (checked against `SHA256SUMS`, attested: `gh attestation verify pixvault-macos-arm64 -R maxgfr/pixvault`).
+
+```bash
+pixvault tools                                      # every tool, by category
+pixvault help compress                              # a tool's options
+pixvault compress --quality 75 --format webp photos/ -o small/
+pixvault convert --to jpeg IMG_0042.HEIC
+pixvault strip --remove gps *.jpg -o shared/
+pixvault resize --by preset --preset ig-portrait --enlarge trip/ -o instagram/
+pixvault watermark --text "© Maxime" --position br *.jpg
+pixvault collage --layout grid a.jpg b.jpg c.jpg d.jpg
+pixvault inspect --json photo.jpg
+pixvault remove-bg product.jpg
+pixvault describe --write embed holiday/*.jpg      # alt text and keywords into the files
+pixvault recipe --step "resize:size=1600" --step "watermark:text=© Me" --format webp photos/
+pixvault recipe --recipe "<link copied from the web app>" photos/
+```
+
+Files go to the current folder (or `-o`), named after the original, never overwriting one (`photo-2.jpg`) unless `--overwrite`. Folders are read recursively. `--json` prints machine-readable reports; the exit code is 1 when a photo failed, 2 on a usage error.
+
+The AI tools download their model once, from its pinned revision on Hugging Face, checked against its SHA-256, into `~/Library/Caches/pixvault` (macOS) or `~/.cache/pixvault` (`PIXVAULT_CACHE` overrides it). `pixvault models` lists, downloads and removes them; `--offline` refuses to download. They run on the processor. Nothing else ever touches the network.
+
 ## How privacy is enforced
 
 - **Content Security Policy**: scripts only from the site, `connect-src` limited to the site, the model hosts and the AI providers listed above, Trusted Types for every script URL, no frames.
@@ -71,6 +101,7 @@ They run with ONNX Runtime Web on the graphics card when the browser has WebGPU,
 - **Engine** (`src/engine/`, TypeScript, runs in a pool of Web Workers): codecs from [jSquash](https://github.com/jamsinclair/jSquash) (MozJPEG, libwebp, libavif, libjxl, OxiPNG, QOI, resize), [libheif](https://github.com/catdad-experiments/libheif-js), [UTIF](https://github.com/photopea/UTIF.js), RAW through the camera's embedded preview, lossless metadata surgery on JPEG/PNG/WebP segments and in-place scrubbing for HEIC/AVIF/TIFF/RAW, pixel operations on one RGBA raster type, ONNX Runtime Web for the models.
 - **Tool catalog** (`src/tools/`): one bilingual list of tools and their fields; the interface renders forms from it, the worker looks implementations up by id.
 - **Interface** (`src/`, React 19, hand-written CSS): designed as a white photo gallery — each photo in a bevel-cut white mat with an accession number, an ink-black bar, one vermilion for the action about to run.
+- **Command line** (`src/cli/`): the same engine and tool catalog under Bun, compiled into one executable (`scripts/cli-binaries.ts`) carrying the codecs, ONNX Runtime and three fonts; text is drawn from the font outlines with [opentype.js](https://github.com/opentypejs/opentype.js) and SVG with [resvg](https://github.com/thx/resvg-js), where the browser has a canvas.
 - **Build** (`scripts/build.ts`): Bun bundles the app and the worker, copies the wasm and the self-hosted models, and writes an offline service worker with a hashed manifest.
 
 ## Development
@@ -84,6 +115,8 @@ bun run lint
 bun run test           # engine unit tests, including the self-hosted models
 bun run build && bun run check:network
 bun run e2e            # Playwright end to end
+bun run cli -- tools   # the command line from source
+bun run build:cli      # standalone binaries into dist-cli/ (PIXVAULT_BIN=dist-cli/… bun test src/cli runs the CLI tests on one)
 bun run catalog        # refresh public/models.json (AI providers with vision models)
 ```
 
@@ -96,7 +129,7 @@ bun run catalog        # refresh public/models.json (AI providers with vision mo
 
 ## Credits
 
-jSquash and Squoosh (Apache-2.0), libheif (LGPL-3.0), UTIF (MIT), exifr (MIT), gifenc and omggif (MIT), pdf-lib (MIT), fflate (MIT), ONNX Runtime Web (MIT), Transformers.js (Apache-2.0), the AI SDK (Apache-2.0), llm-connect (MIT), React (MIT), and the models above.
+jSquash and Squoosh (Apache-2.0), libheif (LGPL-3.0), UTIF (MIT), exifr (MIT), gifenc and omggif (MIT), pdf-lib (MIT), fflate (MIT), ONNX Runtime Web (MIT), Transformers.js (Apache-2.0), the AI SDK (Apache-2.0), llm-connect (MIT), React (MIT), opentype.js (MIT), resvg (MPL-2.0), the Liberation fonts (SIL OFL 1.1, `assets/fonts/`), and the models above.
 
 ## License
 

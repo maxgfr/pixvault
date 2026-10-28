@@ -1,9 +1,12 @@
-// Text as pixels, drawn by the browser's canvas (OffscreenCanvas works in
-// workers): watermarks, captions, labels. System fonts only: the CSP loads
-// nothing from elsewhere, and system-ui reads well in every language.
+// Text as pixels: watermarks, captions, labels. In the browser the canvas
+// draws it (OffscreenCanvas works in workers) with system fonts: the CSP
+// loads nothing from elsewhere, and system-ui reads well in every language.
+// Without a canvas (the command line, the tests) the glyph outlines of the
+// registered fonts are filled here (vector.ts).
 
 import { DecodeError } from "../errors.ts";
 import type { Raster } from "../raster.ts";
+import { hasVectorFonts, vectorText, vectorWidth } from "./vector.ts";
 
 export const FONTS = {
   sans: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
@@ -27,7 +30,9 @@ export interface TextStyle {
   lineHeight?: number;
 }
 
-export const canDrawText = () => typeof OffscreenCanvas === "function";
+const hasCanvas = () => typeof OffscreenCanvas === "function";
+
+export const canDrawText = () => hasCanvas() || hasVectorFonts();
 
 function context(w: number, h: number): OffscreenCanvasRenderingContext2D {
   if (!canDrawText()) throw new DecodeError("drawing text needs a browser canvas", "unsupported");
@@ -40,8 +45,12 @@ const fontOf = (s: TextStyle) => `${s.weight ?? 600} ${Math.max(1, Math.round(s.
 
 /** Split text into lines that fit maxWidth (explicit newlines kept). */
 export function wrap(text: string, s: TextStyle): string[] {
-  const ctx = context(1, 1);
-  ctx.font = fontOf(s);
+  let measure: (t: string) => number;
+  if (hasCanvas()) {
+    const ctx = context(1, 1);
+    ctx.font = fontOf(s);
+    measure = (t) => ctx.measureText(t).width;
+  } else measure = (t) => vectorWidth(t, s);
   const out: string[] = [];
   for (const para of text.split(/\r?\n/)) {
     if (!s.maxWidth) {
@@ -51,7 +60,7 @@ export function wrap(text: string, s: TextStyle): string[] {
     let line = "";
     for (const word of para.split(/\s+/).filter(Boolean)) {
       const next = line ? `${line} ${word}` : word;
-      if (line && ctx.measureText(next).width > s.maxWidth) {
+      if (line && measure(next) > s.maxWidth) {
         out.push(line);
         line = word;
       } else line = next;
@@ -63,6 +72,10 @@ export function wrap(text: string, s: TextStyle): string[] {
 
 /** The text drawn on a transparent raster just big enough to hold it. */
 export function renderText(text: string, s: TextStyle): Raster {
+  if (!hasCanvas()) {
+    if (!hasVectorFonts()) throw new DecodeError("drawing text needs a browser canvas", "unsupported");
+    return vectorText(wrap(text, s), s);
+  }
   const lines = wrap(text, s);
   const lh = Math.round(s.size * (s.lineHeight ?? 1.25));
   const pad = Math.ceil(s.size * (s.shadow ? 0.35 : 0.1));

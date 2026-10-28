@@ -5,6 +5,7 @@
 
 import { MODELS } from "../../ai/catalog.ts";
 import type { Raster } from "../raster.ts";
+import { resize } from "../resize.ts";
 import { hasWebGPUf16, modelFiles, ort } from "./runtime.ts";
 
 // biome-ignore lint: Transformers.js types are heavy; this module only needs a few calls.
@@ -12,11 +13,18 @@ type Any = any;
 
 let loaded: Promise<{ model: Any; processor: Any; tf: Any }> | undefined;
 
+// The command line runs under Bun, where the package resolves to its Node build (native addons): it loads the web build instead.
+let transformers: () => Promise<Any> = () => import("@huggingface/transformers");
+export function setTransformersLoader(fn: () => Promise<Any>) {
+  transformers = fn;
+  loaded = undefined;
+}
+
 function load() {
   loaded ??= (async () => {
     // ONNX Runtime first: its wasm path must point at ./ort/ before Transformers.js looks (it would pick a CDN).
     await ort();
-    const tf: Any = await import("@huggingface/transformers");
+    const tf: Any = await transformers();
     const m = MODELS.caption;
     const bytes = await modelFiles("caption");
     const byPath = new Map(m.files.map((f, i) => [f.path, bytes[i]!]));
@@ -35,13 +43,18 @@ function load() {
       },
       put: async () => {},
     };
-    const base = new URL("./ort/", globalThis.location.href).href;
-    // Only the site's own ONNX Runtime files may be fetched (Transformers.js preloads them); nothing else.
+    // In the browser, only the site's own ONNX Runtime files may be fetched (Transformers.js preloads them);
+    // elsewhere ONNX Runtime already has its wasm in memory (runtime.ts loader), and nothing is fetched at all.
+    // Bun defines a `location` with no address: only a real page origin counts.
+    const href = globalThis.location?.href;
+    const base = typeof href === "string" && /^https?:/.test(href) ? new URL("./ort/", href).href : null;
     env.fetch = async (url: string | URL | Request, init?: RequestInit) => {
       const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
-      return href.startsWith(base) ? fetch(href, init) : new Response(null, { status: 404 });
+      return base && href.startsWith(base) ? fetch(href, init) : new Response(null, { status: 404 });
     };
-    env.backends.onnx.wasm.wasmPaths = { mjs: `${base}ort-wasm-simd-threaded.asyncify.mjs`, wasm: `${base}ort-wasm-simd-threaded.asyncify.wasm` };
+    // Without a page, the CDN default Transformers.js sets on load goes: the bundled glue and the wasm in memory serve.
+    if (base) env.backends.onnx.wasm.wasmPaths = { mjs: `${base}ort-wasm-simd-threaded.asyncify.mjs`, wasm: `${base}ort-wasm-simd-threaded.asyncify.wasm` };
+    else delete env.backends.onnx.wasm.wasmPaths;
     env.backends.onnx.wasm.numThreads = 1;
     const device = (await hasWebGPUf16()) ? "webgpu" : "wasm";
     const dtype = { vision_encoder: "q4", embed_tokens: "int8", encoder_model: "q4", decoder_model_merged: "q4" };
@@ -54,12 +67,15 @@ function load() {
 
 async function ask(r: Raster, task: string): Promise<unknown> {
   const { model, processor, tf } = await load();
-  const image = new tf.RawImage(r.data, r.width, r.height, 4);
+  // Resized here to the model's input size: Transformers.js resizes with a canvas (or sharp, on Node), which the command line has neither of.
+  const size = processor.image_processor?.size;
+  const input = size?.width && size?.height ? await resize(r, size.width, size.height, "catrom") : r;
+  const image = new tf.RawImage(input.data, input.width, input.height, 4);
   const prompts = processor.construct_prompts(task);
   const inputs = await processor(image, prompts);
   const ids = await model.generate({ ...inputs, max_new_tokens: 128 });
   const text = processor.batch_decode(ids, { skip_special_tokens: false })[0];
-  return processor.post_process_generation(text, task, image.size)[task];
+  return processor.post_process_generation(text, task, [r.width, r.height])[task];
 }
 
 const STOP = new Set("a an the of in on at to and or with without from by for is are was were be been being this that these those it its there here into onto over under above below near next up down out as some many few several one two three image photo picture shown showing view of".split(" "));
