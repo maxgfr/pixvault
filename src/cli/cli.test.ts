@@ -103,6 +103,14 @@ describe("commands", () => {
     expect((await readdir(out)).sort()).toEqual(["gps-2.jpg", "gps.jpg"]);
   });
 
+  test("a closed pipe ends the output quietly", async () => {
+    const p = Bun.spawn(["sh", "-c", `${bin.map((a) => `'${a}'`).join(" ")} tools | head -1`], { cwd: work, env: { ...process.env, PIXVAULT_CACHE: cache }, stdout: "pipe", stderr: "pipe" });
+    const [stdout, stderr] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
+    expect(await p.exited).toBe(0);
+    expect(stdout.trim().split("\n")).toHaveLength(1);
+    expect(stderr).toBe("");
+  });
+
   test("models list", async () => {
     const r = await pv(["models", "list"]);
     expect(r.code).toBe(0);

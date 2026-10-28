@@ -458,8 +458,16 @@ export async function main(argv: string[]) {
   return run(t, null, options, rest, flags);
 }
 
+// Piped into `head` or a pager that quits: the reader has what it wanted, so stop quietly like other tools do.
+const closedPipe = (e: unknown) => (e as NodeJS.ErrnoException | undefined)?.code === "EPIPE";
+
 if (import.meta.main) {
+  process.stdout.on("error", (e) => {
+    if (closedPipe(e)) process.exit(0);
+    throw e;
+  });
   main(process.argv.slice(2)).catch((e: unknown) => {
+    if (closedPipe(e)) process.exit(0);
     err(`pixvault: ${e instanceof Error ? e.message : String(e)}`);
     process.exitCode = e instanceof UsageError ? 2 : 1;
   });
