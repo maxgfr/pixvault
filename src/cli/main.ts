@@ -8,7 +8,7 @@
 
 import { mkdir, readdir, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
-import { MODELS, type ModelId, modelBytes } from "../ai/catalog.ts";
+import { MODELS, type ModelId, modelBytes, modelFor } from "../ai/catalog.ts";
 import type { InspectReport } from "../engine/meta/read.ts";
 import { sniff } from "../engine/formats.ts";
 import { type RecipeStep, runRecipe, runTool, STEPS } from "../engine/run/index.ts";
@@ -394,16 +394,23 @@ function listTools(): string {
   return CATEGORIES.map((c) => `${c.title.en}\n${tools.filter((t) => t.category === c.id).map((t) => `  ${t.id.padEnd(15)} ${t.title.en}`).join("\n")}`).join("\n\n");
 }
 
+// No WebGPU on the command line: the models the tools pick on the processor, not the graphics-card ones of the web app.
+const NO_GPU = { f16: false, storage: 0 };
+const CLI_MODELS = new Set(tools.flatMap((t) => [modelFor(t.id, {}, NO_GPU), modelFor(t.id, { scale: "4" }, NO_GPU)]).filter((id): id is ModelId => id !== null));
+
 async function models(args: string[]) {
   const [action = "list", id] = args;
   if (action === "path") return out(cacheDir());
   if (action === "list") {
-    for (const m of Object.values(MODELS)) out(`${(await isDownloaded(m.id)) ? "✓" : " "} ${m.id.padEnd(16)} ${kb(modelBytes(m)).padStart(9)}  ${m.licence.padEnd(10)} ${m.label.en}`);
+    for (const m of Object.values(MODELS).filter((m) => CLI_MODELS.has(m.id))) out(`${(await isDownloaded(m.id)) ? "✓" : " "} ${m.id.padEnd(16)} ${kb(modelBytes(m)).padStart(9)}  ${m.licence.padEnd(10)} ${m.label.en}`);
     out(`\n${(await cachedSize()) / 1e6 > 0 ? `${((await cachedSize()) / 1e6).toFixed(0)} MB in ${cacheDir()}` : `cache: ${cacheDir()}`}`);
     return;
   }
   if (!id || !(id in MODELS)) throw new UsageError(`models ${action} <id>: one of ${Object.keys(MODELS).join(", ")}`);
-  if (action === "download") return downloadModel(id as ModelId);
+  if (action === "download") {
+    if (!CLI_MODELS.has(id as ModelId)) throw new UsageError(`${id} runs on a graphics card, in the web app only; the command line uses ${[...CLI_MODELS].join(", ")}`);
+    return downloadModel(id as ModelId);
+  }
   if (action === "remove") return removeModel(id as ModelId);
   throw new UsageError(`unknown models action ${action}`);
 }

@@ -107,6 +107,10 @@ describe("commands", () => {
     const r = await pv(["models", "list"]);
     expect(r.code).toBe(0);
     expect(r.stdout).toContain("faces");
+    // The graphics-card models of the web app are never picked without WebGPU.
+    expect(r.stdout).not.toContain("upscale-2-gpu");
+    expect(r.stdout).not.toMatch(/^\S*\s+background\s/m);
+    expect((await pv(["models", "download", "upscale-4-gpu"])).code).toBe(2);
   });
 });
 
