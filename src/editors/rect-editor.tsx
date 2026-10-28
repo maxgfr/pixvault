@@ -137,7 +137,7 @@ export function RectEditor({
 
   return (
     <div className="rect-editor" data-shade={shade ? "" : undefined}>
-      <div ref={box} className="rect-stage" style={{ aspectRatio: String(aspect) }} onPointerDown={(e) => down(e, "new", -1)} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
+      <div ref={box} className="rect-stage" style={{ aspectRatio: String(aspect), "--aspect": String(aspect) } as React.CSSProperties} onPointerDown={(e) => down(e, "new", -1)} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
         <img src={src} alt="" draggable={false} />
         {shade && rects[0] ? <div className="rect-shade" style={{ "--x": `${rects[0].x}%`, "--y": `${rects[0].y}%`, "--w": `${rects[0].w}%`, "--h": `${rects[0].h}%` } as React.CSSProperties} /> : null}
         {rects.map((r, i) => (

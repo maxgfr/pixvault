@@ -1114,13 +1114,27 @@ main:focus {
   min-width: 0;
 }
 
-.options {
+/* While settings are being changed, the preview (or editor) stays in view. */
+.stage:has(> .preview, > .rect-editor, > .brush-editor) {
   position: sticky;
   top: 4.5rem;
+  z-index: 2;
+  /* The pinned stage must fit the window: the picture gets what the bar, padding and filmstrip leave. */
+  /* Bar 4.5rem, stage padding 3.5rem, filmstrip 7rem, caption line and frame 7rem. */
+  --rect-max: max(14rem, min(64dvh, calc(100dvh - 24rem)));
+}
+
+.stage:has(> .preview) .compare-frame img,
+.stage:has(> .brush-editor) .brush-stage img,
+.stage:has(> .brush-editor) .brush-stage canvas {
+  max-height: max(14rem, min(64dvh, calc(100dvh - 22rem)));
+}
+
+/* The settings grow with the page (the run button pins to the bottom of the window),
+   so the row is as tall as they are and the preview beside them stays pinned. */
+.options {
   display: grid;
   gap: 1rem;
-  max-height: calc(100dvh - 5.5rem);
-  overflow: auto;
   padding: 0.2rem;
 }
 
@@ -1372,6 +1386,10 @@ main:focus {
   color: var(--ink-2);
 }
 
+.preview-line:empty {
+  display: none;
+}
+
 .preview-line[data-busy] {
   color: var(--muted);
 }
@@ -1455,8 +1473,8 @@ main:focus {
 
 .rect-stage {
   position: relative;
-  max-height: 64dvh;
-  max-width: 100%;
+  /* Width from the photo's ratio, so a capped height never squashes it. */
+  width: min(100%, calc(var(--rect-max, 64dvh) * var(--aspect, 1.5)));
   margin: 0 auto;
   touch-action: none;
   user-select: none;
@@ -1909,6 +1927,43 @@ main:focus {
   .workspace,
   .tool-body {
     grid-template-columns: minmax(0, 1fr);
+  }
+  /* Stacked: the preview pins under the bar, small enough to leave the sliders room. */
+  .stage:has(> .preview, > .rect-editor, > .brush-editor) {
+    top: 3.5rem;
+    padding: 0.5rem;
+    gap: 0.4rem;
+    box-shadow: 0 8px 18px -12px rgb(0 0 0 / 0.45);
+  }
+  .stage:has(> .rect-editor) {
+    --rect-max: 30dvh;
+  }
+  /* Room for the fields between the pinned preview and the end of the page. */
+  html:has(.stage > .preview, .stage > .rect-editor, .stage > .brush-editor) {
+    scroll-padding-top: 52dvh;
+  }
+  .tool-body .run {
+    position: static;
+  }
+  .stage:has(> .preview) .compare-frame img,
+  .stage:has(> .brush-editor) .brush-stage img,
+  .stage:has(> .brush-editor) .brush-stage canvas {
+    max-height: 30dvh;
+  }
+  .stage:has(> .preview) .compare {
+    min-height: 0;
+    padding: 0.25rem;
+  }
+  .stage .film-frame {
+    width: 2.75rem;
+    padding: 0.15rem;
+  }
+  .stage .film-frame .accession {
+    display: none;
+  }
+  .stage .rect-editor > .note,
+  .stage .brush-editor > .note {
+    display: none;
   }
   .actions,
   .options {
