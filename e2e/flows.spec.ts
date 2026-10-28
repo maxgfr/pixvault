@@ -108,18 +108,22 @@ test("an iPhone HEIC shows its size and compresses to a format the browser can w
 
 test("stopping a batch leaves the app ready to run again", async ({ page }) => {
   const w = await watch(page);
-  await drop(page, ["gps.jpg", "plain.jpg", "gps.jpg", "plain.jpg"]);
-  await page.goto("./#/convert");
-  await page.getByLabel("Convert to", { exact: true }).selectOption("avif");
+  await drop(page, ["gps.jpg", "plain.jpg", "gps.jpg", "plain.jpg", "gps.jpg", "plain.jpg", "gps.jpg", "plain.jpg"]);
+  // A deliberately long job: AVIF searched down to a tiny size takes many encodes per photo.
+  await page.goto("./#/compress");
+  await page.getByLabel("Aim for").selectOption("size");
+  await page.getByLabel("Maximum size").fill("5");
+  await page.getByLabel("Format", { exact: true }).selectOption("avif");
   await page.locator(".run-button").click();
-  await page.getByRole("button", { name: "Stop" }).click();
+  await page.getByRole("button", { name: "Stop" }).click({ timeout: 10_000 });
   await expect(page.locator(".run-button")).toBeEnabled();
   await expect(page.getByRole("region", { name: "Results" })).toHaveCount(0);
+  await page.goto("./#/convert");
   await page.getByLabel("Convert to", { exact: true }).selectOption("webp");
   await page.locator(".run-button").click();
   const results = page.getByRole("region", { name: "Results" });
   await expect(results).toBeVisible({ timeout: 60_000 });
-  await expect(results.locator(".result-row")).toHaveCount(4);
+  await expect(results.locator(".result-row")).toHaveCount(8);
   await expect(results.locator(".error-text")).toHaveCount(0);
   await w.assertClean();
 });

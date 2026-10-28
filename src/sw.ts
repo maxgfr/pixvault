@@ -27,12 +27,25 @@ sw.addEventListener("install", (event: ExtendableEvent) => {
   );
 });
 
+// The previous version's files stay cached: a tab still open on it keeps
+// finding its own code (hashed names the new deploy no longer has) until it
+// reloads. Older versions are deleted.
+const META = "pixvault-meta";
+const KEEP_VERSIONS = 2;
+
 sw.addEventListener("activate", (event: ExtendableEvent) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith("pixvault-") && k !== CACHE && k !== INBOX && k !== MODELS).map((k) => caches.delete(k))))
-      .then(() => sw.clients.claim()),
+    (async () => {
+      const meta = await caches.open(META);
+      const res = await meta.match(abs("./__versions"));
+      const versions = ((res ? await res.json() : []) as string[]).filter((v) => v !== CACHE);
+      versions.push(CACHE);
+      const keep = new Set([...versions.slice(-KEEP_VERSIONS), INBOX, MODELS, META]);
+      await meta.put(abs("./__versions"), new Response(JSON.stringify(versions.slice(-KEEP_VERSIONS))));
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => k.startsWith("pixvault-") && !keep.has(k)).map((k) => caches.delete(k)));
+      await sw.clients.claim();
+    })(),
   );
 });
 
@@ -61,7 +74,8 @@ sw.addEventListener("fetch", (event: FetchEvent) => {
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE);
-      const hit = await cache.match(key);
+      // This version first, then the previous one (for tabs still running it).
+      const hit = (await cache.match(key)) ?? (req.mode === "navigate" ? undefined : await caches.match(key));
       if (hit) return hit;
       const res = await fetch(req);
       if (res.ok && (lazySet.has(key) || key === abs("./"))) await cache.put(key, res.clone());
