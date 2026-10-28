@@ -10,11 +10,28 @@ import { DecodeError } from "../errors.ts";
 
 export type OrtModule = typeof Ort;
 
+/** The adapter's own limits, not WebGPU's defaults: BiRefNet needs 11 storage buffers per shader where the default is 10. */
+const LIMITS: (keyof GPUSupportedLimits)[] = ["maxStorageBuffersPerShaderStage", "maxBufferSize", "maxStorageBufferBindingSize", "maxComputeWorkgroupStorageSize", "maxComputeInvocationsPerWorkgroup", "maxComputeWorkgroupSizeX", "maxComputeWorkgroupSizeY", "maxComputeWorkgroupSizeZ"];
+
 let ortLoader: () => Promise<OrtModule> = async () => {
   const ort = (await import("onnxruntime-web/webgpu")) as unknown as OrtModule;
   const base = new URL("./ort/", globalThis.location.href).href;
   ort.env.wasm.wasmPaths = { mjs: `${base}ort-wasm-simd-threaded.asyncify.mjs`, wasm: `${base}ort-wasm-simd-threaded.asyncify.wasm` };
   ort.env.wasm.numThreads = 1;
+  try {
+    const adapter = await globalThis.navigator?.gpu?.requestAdapter({ powerPreference: "high-performance" });
+    if (adapter) {
+      const requiredLimits: Record<string, number> = {};
+      for (const k of LIMITS) if (typeof adapter.limits[k] === "number") requiredLimits[k] = adapter.limits[k] as number;
+      const requiredFeatures = (["shader-f16", "subgroups"] as GPUFeatureName[]).filter((f) => adapter.features.has(f));
+      const device = await adapter.requestDevice({ requiredFeatures, requiredLimits });
+      const webgpu = ort.env.webgpu as unknown as { adapter: unknown; device: unknown };
+      webgpu.adapter = adapter;
+      webgpu.device = device;
+    }
+  } catch {
+    // No usable device: models fall back to WebAssembly.
+  }
   return ort;
 };
 
@@ -42,23 +59,28 @@ export function setAiLoaders(o: { ort?: () => Promise<OrtModule>; files?: (id: M
 let ortPromise: Promise<OrtModule> | undefined;
 export const ort = () => (ortPromise ??= ortLoader());
 
-let gpu: Promise<{ ok: boolean; f16: boolean }> | undefined;
+let gpu: Promise<{ ok: boolean; f16: boolean; storage: number }> | undefined;
 function probe() {
   gpu ??= (async () => {
-    const nav = globalThis.navigator as Navigator & { gpu?: { requestAdapter(): Promise<{ features: Set<string> } | null> } };
     try {
-      const adapter = nav?.gpu ? await nav.gpu.requestAdapter() : null;
-      return { ok: Boolean(adapter), f16: Boolean(adapter?.features.has("shader-f16")) };
+      const adapter = await globalThis.navigator?.gpu?.requestAdapter({ powerPreference: "high-performance" });
+      return { ok: Boolean(adapter), f16: Boolean(adapter?.features.has("shader-f16")), storage: adapter?.limits.maxStorageBuffersPerShaderStage ?? 0 };
     } catch {
-      return { ok: false, f16: false };
+      return { ok: false, f16: false, storage: 0 };
     }
   })();
   return gpu;
 }
 
+/** What the page sees too (src/ai/download.ts), so both pick the same model. */
+export const gpuSupport = async () => {
+  const p = await probe();
+  return { f16: p.f16, storage: p.storage };
+};
+
 /** Whether WebGPU can run here (an adapter exists). */
 export const hasWebGPU = async () => (await probe()).ok;
-/** Whether it can also run half-precision models (BiRefNet ships in fp16). */
+/** Whether it can also run half-precision models (BiRefNet ships in fp16): the bar for using the graphics card at all. */
 export const hasWebGPUf16 = async () => (await probe()).f16;
 
 export const modelFiles = (id: ModelId) => fileLoader(id);
@@ -72,7 +94,7 @@ export function session(id: ModelId): Promise<Ort.InferenceSession> {
     s = (async () => {
       const o = await ort();
       const [bytes] = await fileLoader(id);
-      const providers = (await hasWebGPU()) ? ["webgpu", "wasm"] : ["wasm"];
+      const providers = MODELS[id].gpu && (await hasWebGPUf16()) ? ["webgpu", "wasm"] : ["wasm"];
       try {
         return await o.InferenceSession.create(bytes!, { executionProviders: providers, graphOptimizationLevel: "all" });
       } catch (e) {

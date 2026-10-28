@@ -15,6 +15,8 @@ export interface ModelFile {
 
 export interface ModelDef {
   id: ModelId;
+  /** Run on the graphics card when WebGPU can (fp16/fp32 graphs); quantised graphs are faster on the processor. */
+  gpu?: boolean;
   label: L;
   licence: string;
   credit: string;
@@ -25,13 +27,14 @@ export interface ModelDef {
   files: ModelFile[];
 }
 
-export type ModelId = "background" | "background-lite" | "upscale-2" | "upscale-4" | "faces" | "inpaint" | "caption";
+export type ModelId = "background" | "background-lite" | "upscale-2" | "upscale-4" | "upscale-2-gpu" | "upscale-4-gpu" | "faces" | "inpaint" | "caption";
 
 const q = (en: string, fr: string): L => ({ en, fr });
 
 export const MODELS: Record<ModelId, ModelDef> = {
   background: {
     id: "background",
+    gpu: true,
     label: q("BiRefNet lite, background removal", "BiRefNet lite, détourage"),
     licence: "MIT",
     credit: "ZhengPeng7 (BiRefNet), ONNX by onnx-community",
@@ -49,7 +52,8 @@ export const MODELS: Record<ModelId, ModelDef> = {
     host: "site",
     repo: "Xenova/modnet",
     revision: "fa2fa546052fba4c08921230a26cc69a333fca12",
-    files: [{ path: "onnx/model_quantized.onnx", bytes: 6_632_188, sha256: "92e49898c3e05a6d7a944fc67a8cb87c4aad754ffb6ebd949528c7d1105fee3a" }],
+    // Full precision: the 8-bit build loses whole bodies (checked on group portraits).
+    files: [{ path: "onnx/model.onnx", bytes: 25_888_640, sha256: "07c308cf0fc7e6e8b2065a12ed7fc07e1de8febb7dc7839d7b7f15dd66584df9" }],
   },
   "upscale-2": {
     id: "upscale-2",
@@ -70,6 +74,30 @@ export const MODELS: Record<ModelId, ModelDef> = {
     repo: "Xenova/swin2SR-realworld-sr-x4-64-bsrgan-psnr",
     revision: "d0e9926970c93e472ce2392373d72597fc849027",
     files: [{ path: "onnx/model_uint8.onnx", bytes: 18_999_633, sha256: "a60f3781f8e3a48babc94cfe7bfb02a61102f3cccff59574ae55673f5a70f931" }],
+  },
+  // Full-precision builds for graphics cards: the 8-bit ones gain nothing on WebGPU, and the published
+  // fp16 export is broken (its output reuses the input's dimension names, so every run fails).
+  "upscale-2-gpu": {
+    id: "upscale-2-gpu",
+    gpu: true,
+    label: q("Swin2SR ×2, super-resolution (graphics card)", "Swin2SR ×2, super-résolution (carte graphique)"),
+    licence: "Apache-2.0",
+    credit: "Conde et al. (Swin2SR), ONNX by Xenova",
+    host: "site",
+    repo: "Xenova/swin2SR-classical-sr-x2-64",
+    revision: "93dfc9089abda257351d3a58d5771e2c1ff69442",
+    files: [{ path: "onnx/model.onnx", bytes: 54_428_699, sha256: "6dde3fe2440543ccae7c40d175609f83c18aeaa3d8456745c4329ef97ae744bd" }],
+  },
+  "upscale-4-gpu": {
+    id: "upscale-4-gpu",
+    gpu: true,
+    label: q("Swin2SR ×4 real-world, super-resolution (graphics card)", "Swin2SR ×4 photos réelles, super-résolution (carte graphique)"),
+    licence: "Apache-2.0",
+    credit: "Conde et al. (Swin2SR), ONNX by Xenova",
+    host: "site",
+    repo: "Xenova/swin2SR-realworld-sr-x4-64-bsrgan-psnr",
+    revision: "d0e9926970c93e472ce2392373d72597fc849027",
+    files: [{ path: "onnx/model.onnx", bytes: 52_772_645, sha256: "f496dc73dcc01d778b1a12eb4c4038d6b27cd1c0b5bcd4258455ed6d7816c835" }],
   },
   faces: {
     id: "faces",
@@ -93,6 +121,7 @@ export const MODELS: Record<ModelId, ModelDef> = {
   },
   caption: {
     id: "caption",
+    gpu: true,
     label: q("Florence-2 base, captions", "Florence-2 base, légendes"),
     licence: "MIT",
     credit: "Microsoft (Florence-2), ONNX by onnx-community",
@@ -114,13 +143,26 @@ export const MODELS: Record<ModelId, ModelDef> = {
   },
 };
 
-/** Which model each AI tool needs (upscale depends on the chosen factor). */
-export function modelFor(tool: string, options: Record<string, unknown> = {}, webgpu = true): ModelId | null {
+/** Which model each AI tool needs on this device (upscale depends on the chosen factor). */
+export interface GpuSupport {
+  /** WebGPU with fp16 shaders. */
+  f16: boolean;
+  /** Storage buffers a shader may bind: BiRefNet needs 11 (Chrome on Apple GPUs allows 10). */
+  storage: number;
+}
+
+export const BIREFNET_STORAGE_BUFFERS = 11;
+
+/** BiRefNet runs only where WebGPU has fp16 and enough storage buffers; MODNet everywhere else. */
+export const backgroundModel = (gpu: GpuSupport): ModelId => (gpu.f16 && gpu.storage >= BIREFNET_STORAGE_BUFFERS ? "background" : "background-lite");
+
+export function modelFor(tool: string, options: Record<string, unknown>, gpu: GpuSupport): ModelId | null {
+  const webgpu = gpu.f16;
   switch (tool) {
     case "remove-bg":
-      return webgpu ? "background" : "background-lite";
+      return backgroundModel(gpu);
     case "upscale":
-      return String(options.scale ?? "2") === "4" ? "upscale-4" : "upscale-2";
+      return `upscale-${String(options.scale ?? "2") === "4" ? "4" : "2"}${webgpu ? "-gpu" : ""}` as ModelId;
     case "blur-faces":
     case "smart-crop":
       return "faces";

@@ -81,6 +81,17 @@ describe.if(ready)("with the models", () => {
     expect(await detectFaces(sample(320, 240))).toEqual([]);
   }, 60_000);
 
+  test("YuNet finds the three faces of a crew portrait", async () => {
+    // fixtures/crew.jpg: NASA Expedition 61 crew portrait (public domain), reduced.
+    const { decode } = await import("../codecs.ts");
+    const r = await decode(new Uint8Array(await Bun.file(new URL("../../../fixtures/crew.jpg", import.meta.url)).arrayBuffer()));
+    const faces = await detectFaces(r);
+    expect(faces).toHaveLength(3);
+    for (const f of faces) expect(f.score).toBeGreaterThan(0.8);
+    // Faces sit in the top third of this portrait.
+    for (const f of faces) expect(f.y + f.height).toBeLessThan(r.height / 3);
+  }, 60_000);
+
   test("MI-GAN fills only the painted pixels", async () => {
     const r = sample(300, 200);
     const mask = new Uint8Array(300 * 200);

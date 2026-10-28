@@ -50,7 +50,7 @@ test("the AI page lists the models and loads the provider settings without calli
   const w = await watch(page);
   await page.goto("./#/ai");
   await expect(page.getByRole("heading", { level: 1, name: "AI on your device" })).toBeVisible();
-  await expect(page.locator(".model-row")).toHaveCount(7);
+  await expect(page.locator(".model-row")).toHaveCount(9);
   await expect(page.getByLabel("API key")).toBeVisible();
   await w.assertClean();
 });

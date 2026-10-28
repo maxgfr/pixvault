@@ -50,9 +50,9 @@ Every model is open, downloaded once only when you first use its tool, checked a
 
 | Tool | Model | Licence | Size | Served from |
 |---|---|---|---|---|
-| Remove background | [BiRefNet lite](https://github.com/ZhengPeng7/BiRefNet) (with WebGPU) | MIT | 115 MB | Hugging Face |
-| Remove background | [MODNet](https://github.com/ZHKKKe/MODNet) (without WebGPU, best on people) | Apache-2.0 | 7 MB | this site |
-| Upscale ×2 / ×4 | [Swin2SR](https://github.com/mv-lab/swin2sr) | Apache-2.0 | 19 MB each | this site |
+| Remove background | [BiRefNet lite](https://github.com/ZhengPeng7/BiRefNet) (graphics cards whose WebGPU has fp16 and 11 storage buffers per shader) | MIT | 115 MB | Hugging Face |
+| Remove background | [MODNet](https://github.com/ZHKKKe/MODNet) (everywhere else, including Chrome on Apple GPUs; best on people) | Apache-2.0 | 26 MB | this site |
+| Upscale ×2 / ×4 | [Swin2SR](https://github.com/mv-lab/swin2sr) (full precision with WebGPU, 8-bit otherwise) | Apache-2.0 | 54 MB / 19 MB each | this site |
 | Blur faces, smart crop | [YuNet](https://github.com/opencv/opencv_zoo) | MIT | 0.2 MB | this site |
 | Erase objects | [MI-GAN](https://github.com/Picsart-AI-Research/MI-GAN) | MIT | 28 MB | this site |
 | Describe and tag | [Florence-2 base](https://huggingface.co/microsoft/Florence-2-base-ft) | MIT | 218 MB | Hugging Face |
@@ -70,7 +70,7 @@ They run with ONNX Runtime Web on the graphics card when the browser has WebGPU,
 
 - **Engine** (`src/engine/`, TypeScript, runs in a pool of Web Workers): codecs from [jSquash](https://github.com/jamsinclair/jSquash) (MozJPEG, libwebp, libavif, libjxl, OxiPNG, QOI, resize), [libheif](https://github.com/catdad-experiments/libheif-js), [UTIF](https://github.com/photopea/UTIF.js), RAW through the camera's embedded preview, lossless metadata surgery on JPEG/PNG/WebP segments and in-place scrubbing for HEIC/AVIF/TIFF/RAW, pixel operations on one RGBA raster type, ONNX Runtime Web for the models.
 - **Tool catalog** (`src/tools/`): one bilingual list of tools and their fields; the interface renders forms from it, the worker looks implementations up by id.
-- **Interface** (`src/`, React 19, hand-written CSS): designed as a museum print room — each photo in a bevel-cut mat with an accession number, archival-box blue-grey shell, one conservation red for the action about to run.
+- **Interface** (`src/`, React 19, hand-written CSS): designed as a white photo gallery — each photo in a bevel-cut white mat with an accession number, an ink-black bar, one vermilion for the action about to run.
 - **Build** (`scripts/build.ts`): Bun bundles the app and the worker, copies the wasm and the self-hosted models, and writes an offline service worker with a hashed manifest.
 
 ## Development

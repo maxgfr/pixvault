@@ -33,8 +33,9 @@ scope.onmessage = async (e: MessageEvent<JobRequest>) => {
   };
   try {
     if (req.kind === "thumb") {
-      const [{ before }, report] = await Promise.all([preview(req.input, [], req.maxSide, ctx, true), inspect(req.input.bytes, req.input.name)]);
-      post({ id: req.id, type: "done", files: [before], report }, [before.bytes.buffer as ArrayBuffer]);
+      const [{ before, width, height }, report] = await Promise.all([preview(req.input, [], req.maxSide, ctx, true), inspect(req.input.bytes, req.input.name)]);
+      // The decoded size is the truth: headers of tiled or rotated photos (HEIC) do not always say it.
+      post({ id: req.id, type: "done", files: [before], report: { ...report, width, height } }, [before.bytes.buffer as ArrayBuffer]);
       return;
     }
     if (req.kind === "preview") {

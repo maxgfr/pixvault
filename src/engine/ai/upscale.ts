@@ -5,7 +5,7 @@
 import { raster, type Raster } from "../raster.ts";
 import { resize } from "../resize.ts";
 import type { Ctx } from "../run/types.ts";
-import { hasWebGPU, ort, session } from "./runtime.ts";
+import { hasWebGPUf16, ort, session } from "./runtime.ts";
 
 const OVERLAP = 8;
 
@@ -20,8 +20,9 @@ export function tileStarts(length: number, tile: number): number[] {
 
 export async function upscale(r: Raster, scale: 2 | 4, ctx?: Pick<Ctx, "progress" | "check">): Promise<Raster> {
   const o = await ort();
-  const s = await session(scale === 4 ? "upscale-4" : "upscale-2");
-  const tile = (await hasWebGPU()) ? 192 : 64;
+  const gpu = await hasWebGPUf16();
+  const s = await session(`upscale-${scale}${gpu ? "-gpu" : ""}`);
+  const tile = gpu ? 192 : 64;
   // A photo smaller than a tile is padded by repeating its edge.
   const tw = Math.min(tile, Math.ceil(r.width / 8) * 8);
   const th = Math.min(tile, Math.ceil(r.height / 8) * 8);

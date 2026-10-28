@@ -5,8 +5,8 @@ import "./ai/zod-jitless.ts";
 import { useLlmSettings } from "llm-connect/react";
 import { useEffect, useState } from "react";
 import { llm, loadLlm } from "./ai/byok.ts";
-import { MODELS, type ModelId, modelBytes } from "./ai/catalog.ts";
-import { download, removeModel, useDownloaded, useWebGPU } from "./ai/download.ts";
+import { backgroundModel, MODELS, type ModelId, modelBytes } from "./ai/catalog.ts";
+import { download, removeModel, useDownloaded, useGpu } from "./ai/download.ts";
 import { bytes, useLang } from "./i18n.ts";
 import { Icon } from "./icons.tsx";
 
@@ -148,7 +148,8 @@ function Provider() {
 
 export function AiPage() {
   const { t } = useLang();
-  const webgpu = useWebGPU();
+  const gpu = useGpu();
+  const webgpu = gpu ? gpu.f16 : null;
   return (
     <article className="prose ai-page">
       <h1>{t("AI on your device", "IA sur votre appareil")}</h1>
@@ -163,7 +164,10 @@ export function AiPage() {
           ? ""
           : webgpu
             ? t("This browser has full WebGPU: the models run on the graphics card.", "Ce navigateur a WebGPU complet : les modèles tournent sur la carte graphique.")
-            : t("This browser lacks full WebGPU (with half precision): the models run more slowly, and background removal uses the lighter MODNet (best on people).", "Ce navigateur n'a pas WebGPU complet (demi-précision) : les modèles tournent plus lentement, et le détourage utilise MODNet, plus léger (idéal pour les personnes).")}
+            : t("This browser lacks full WebGPU (with half precision): the models run on the processor, more slowly.", "Ce navigateur n'a pas WebGPU complet (demi-précision) : les modèles tournent sur le processeur, plus lentement.")}{" "}
+        {gpu && backgroundModel(gpu) === "background-lite"
+          ? t("Background removal uses MODNet here (best on people): BiRefNet needs a graphics card this browser does not expose.", "Le détourage utilise ici MODNet (idéal pour les personnes) : BiRefNet demande une carte graphique que ce navigateur n'expose pas.")
+          : ""}
       </p>
       <ul className="model-rows">
         {(Object.keys(MODELS) as ModelId[]).map((id) => (

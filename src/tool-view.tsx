@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { modelFor } from "./ai/catalog.ts";
-import { useDownloaded, useWebGPU } from "./ai/download.ts";
+import { useDownloaded, useGpu } from "./ai/download.ts";
 import { Compare } from "./compare.tsx";
 import { BrushEditor } from "./editors/brush-editor.tsx";
 import { ModelGate } from "./editors/model-gate.tsx";
@@ -91,7 +91,8 @@ function usePreview(tool: ToolDef, photo: Photo | undefined, options: Options, m
       // Keep the previous images on screen until the next ones arrive.
       setTimeout(() => urls.forEach((u) => URL.revokeObjectURL(u)), 4000);
     };
-  }, [photo?.key, photo?.bytes, kind, key, tool.id, modelReady]);
+    // A plain preview shows the photo itself: it must not reload (and clear a brush) when the model arrives.
+  }, [photo?.key, photo?.bytes, kind, key, tool.id, kind === "plain" ? false : modelReady]);
   return state;
 }
 
@@ -104,10 +105,12 @@ export function ToolView({ tool }: { tool: ToolDef }) {
   const runner = useRunner();
   const fields = useMemo(() => [...tool.fields, ...(tool.output ? OUTPUT_FIELDS : [])], [tool]);
   const photo = sel.find((p) => p.key === focus) ?? sel[0];
-  const webgpu = useWebGPU();
-  const modelId = tool.model ? modelFor(tool.id, options, webgpu ?? true) : null;
+  const gpu = useGpu();
+  // Until the device is known, the model is not chosen and nothing runs.
+  const modelId = tool.model && gpu ? modelFor(tool.id, options, gpu) : null;
   const haveModel = useDownloaded(modelId);
-  const modelReady = !modelId || haveModel === true;
+  const needsModel = Boolean(tool.model) && !(tool.id === "describe" && options.engine === "api");
+  const modelReady = !needsModel || (modelId !== null && haveModel === true);
   const preview = usePreview(tool, runner.outcomes ? undefined : photo, options, modelReady);
   const [asking, setAsking] = useState(false);
   const viaApi = tool.id === "describe" && options.engine === "api";

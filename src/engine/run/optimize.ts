@@ -26,7 +26,9 @@ export type CompressNote =
   /** Size mode: even the smallest attempt is above the target. */
   | "target-missed"
   /** Lossless mode on a JPEG: it cannot be recompressed without loss, so it is kept. */
-  | "lossless-jpeg";
+  | "lossless-jpeg"
+  /** The source format (HEIC, RAW, SVG…) cannot be written here: the smallest of the formats that can was chosen. */
+  | "source-unwritable";
 
 export interface CompressReport {
   name: string;
@@ -117,7 +119,16 @@ async function fitSizeTarget(r: Raster, format: OutFormat, target: number, effor
   return { a: last, note: "target-missed" };
 }
 
-function candidatesFor(asked: string, source: Format, r: Raster, lossless: boolean): OutFormat[] {
+/** Formats pixvault can write; "same format" for anything else means the most compact one it can. */
+const WRITABLE = new Set<Format>(["jpeg", "png", "webp", "avif", "jxl", "gif", "bmp", "tiff", "qoi", "ico"]);
+
+function candidatesFor(asked: string, source: Format, r: Raster, lossless: boolean, keepsMeta: boolean): OutFormat[] {
+  if (asked === "keep" && !WRITABLE.has(source)) {
+    // HEIC is as compact as AVIF, but AVIF output carries no photo details here: offer it only when they are dropped anyway.
+    if (lossless) return ["png", "webp"];
+    const alpha = !opaque(r);
+    return alpha ? ["webp", "png", ...(keepsMeta ? [] : (["avif"] as OutFormat[]))] : ["webp", "jpeg", ...(keepsMeta ? [] : (["avif"] as OutFormat[]))];
+  }
   if (asked === "auto") {
     if (lossless) return ["png", "webp", "jxl"];
     const alpha = !opaque(r);
@@ -145,7 +156,7 @@ async function compressOne(input: Input, o: Options): Promise<{ file: Output; re
   }
   const asked = str(o.format, "keep");
   const lossless = mode === "lossless";
-  const formats = candidatesFor(asked, source, r, lossless);
+  const formats = candidatesFor(asked, source, r, lossless, metaMode !== "strip");
   const target = Math.max(1, num(o.targetKb, 300)) * 1024;
 
   const keep = (note: CompressNote): { file: Output; report: CompressReport } => ({
@@ -171,6 +182,7 @@ async function compressOne(input: Input, o: Options): Promise<{ file: Output; re
     }
   }
   if (!best) throw new DecodeError("nothing to encode", "bad-options");
+  if (asked === "keep" && !WRITABLE.has(source) && !note) note = "source-unwritable";
   // Never larger: the same format, the same pixels, and no gain → the original, untouched.
   if (!resized && best.format === source && best.bytes.length >= input.bytes.length) return keep("kept-original");
   const bytes = await carryMeta(best.bytes, best.format, input.bytes, source, meta, metaMode);
