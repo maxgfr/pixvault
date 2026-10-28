@@ -8,6 +8,9 @@ import { join, relative } from "node:path";
 const dist = process.argv[2] ?? "dist";
 
 
+// The lazy Transformers.js chunk (Florence-2 captions), and the CSP meta tag.
+const TRANSFORMERS = /^assets\/w-transformers[\w.-]*\.js$/;
+
 // Hosts that may appear as inert strings, each with the reason it is safe,
 // and the files they may appear in when that is narrower than every file.
 const ALLOWED_HOSTS: [string, string, RegExp?][] = [
@@ -16,6 +19,32 @@ const ALLOWED_HOSTS: [string, string, RegExp?][] = [
   ["maxgfr.github.io", "the site's own canonical address in a <link rel=canonical>"],
   ["github.com", "the 'Source' links: anchors the user chooses to follow, not requests"],
   ["ns.adobe.com", "XMP namespace strings, matched in and written to photo metadata, never requested"],
+  ["purl.org", "Dublin Core namespace written into XMP descriptions, never requested"],
+  ["json-schema.org", "JSON Schema identifiers inside the AI SDK, never requested"],
+  // The user's own AI provider ("Describe and tag" with an API key): called only after the user saves a provider
+  // on the AI page and runs the tool; index.html's connect-src lists exactly these, and models.json carries their base URLs.
+  ["api.openai.com", "OpenAI API, only with the user's saved key"],
+  ["api.anthropic.com", "Anthropic API, only with the user's saved key"],
+  ["generativelanguage.googleapis.com", "Google Gemini API, only with the user's saved key"],
+  ["api.mistral.ai", "Mistral API, only with the user's saved key"],
+  ["openrouter.ai", "OpenRouter API, only with the user's saved key"],
+  ["api.groq.com", "Groq API, only with the user's saved key"],
+  ["api.x.ai", "xAI API, only with the user's saved key"],
+  ["ai-gateway.vercel.sh", "the AI SDK's default gateway, never selected (llm-connect builds provider-specific models) and blocked by the CSP"],
+  ["ai-sdk.dev", "documentation links in AI SDK error messages, never requested"],
+  ["vercel.com", "documentation links in AI SDK error messages, never requested"],
+  ["ai.google.dev", "documentation links in the Google provider's error messages, never requested"],
+  ["docs.cloud.google.com", "documentation links in the Google provider's error messages, never requested"],
+  ["google.aip.dev", "documentation links in the Google provider's error messages, never requested"],
+  // On-device AI.
+  [
+    "huggingface.co",
+    "where BiRefNet and Florence-2 are downloaded from (src/ai/catalog.ts), only after the user agrees, pinned by revision and SHA-256; the CSP's connect-src allows huggingface.co and its download servers for that. Also Transformers.js's default model host, disabled in caption.ts (allowRemoteModels = false, fetch refused)",
+  ],
+  ["web.dev", "documentation link inside an ONNX Runtime error message, never requested"],
+  ["cdn.jsdelivr.net", "Transformers.js's default location for ONNX Runtime's wasm; caption.ts points it at the site's own ort/ first, and the CSP would block this host", TRANSFORMERS],
+  ["developer.mozilla.org", "a documentation link inside a Transformers.js error message, never requested", TRANSFORMERS],
+  ["gist.github.com", "a link inside a Transformers.js error message, never requested", TRANSFORMERS],
 ];
 
 const URL_RE = /\bhttps?:\/\/([a-z0-9.-]+\.[a-z]{2,})/gi;
