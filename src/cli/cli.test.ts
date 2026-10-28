@@ -7,7 +7,7 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { copyFile, mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import exifr from "exifr";
 import { unzipSync } from "fflate";
 import { MODELS } from "../ai/catalog.ts";
@@ -19,7 +19,7 @@ setDefaultTimeout(60_000);
 
 const repo = new URL("../../", import.meta.url).pathname;
 const fixtures = `${repo}fixtures/`;
-const bin = process.env.PIXVAULT_BIN ? [join(repo, process.env.PIXVAULT_BIN)] : ["bun", `${repo}src/cli/main.ts`];
+const bin = process.env.PIXVAULT_BIN ? [resolve(repo, process.env.PIXVAULT_BIN)] : ["bun", `${repo}src/cli/main.ts`];
 let work = "";
 let cache = "";
 
