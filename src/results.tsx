@@ -51,7 +51,7 @@ export function Results({ tool, outcomes, onBack }: { tool: ToolDef; outcomes: O
   const files = rows.flatMap((r) => (r.file ? [r.file] : []));
   const failed = outcomes.filter((o) => o.error);
   const perPhoto = tool.input === "image" && outcomes.every((o) => o.files.length <= 1);
-  const before = outcomes.reduce((n, o) => n + (o.files.length ? o.inputs.reduce((m, p) => m + p.bytes.length, 0) : 0), 0);
+  const before = outcomes.reduce((n, o) => n + (o.files.length ? o.inputs.reduce((m, p) => m + p.size, 0) : 0), 0);
   const after = files.reduce((n, f) => n + f.bytes.length, 0);
   const notes = new Map(reportsOf<CompressReport>(outcomes).filter((r) => r && "note" in r).map((r) => [r.name, r.note]));
 
@@ -66,8 +66,9 @@ export function Results({ tool, outcomes, onBack }: { tool: ToolDef; outcomes: O
   const keep = (r: Row) => {
     if (!r.file) return;
     const src = r.outcome.inputs[0];
-    if (perPhoto && src && workspace.get(src.key)) workspace.replace(src.key, r.file.name, r.file.bytes);
-    else workspace.add([{ name: r.file.name, bytes: r.file.bytes, unsaved: true }]);
+    const file = new Blob([r.file.bytes as BlobPart], { type: r.file.mime });
+    if (perPhoto && src && workspace.get(src.key)) void workspace.replace(src.key, r.file.name, file);
+    else void workspace.add([{ name: r.file.name, file, unsaved: true }]);
     setKept((s) => new Set(s).add(r.key));
   };
 
@@ -145,7 +146,7 @@ export function Results({ tool, outcomes, onBack }: { tool: ToolDef; outcomes: O
       <ul className="result-rows">
         {rows.map((r) => {
           const src = r.outcome.inputs[0];
-          const inSize = perPhoto ? (src?.bytes.length ?? 0) : 0;
+          const inSize = perPhoto ? (src?.size ?? 0) : 0;
           const note = r.file ? notes.get(src?.name ?? "") : undefined;
           return (
             <li key={r.key} className="result-row" data-error={r.outcome.error ? "" : undefined}>

@@ -151,7 +151,7 @@ export function RecipePage() {
               <DropMat compact />
             )}
             {runner.progress ? <p className="num note">{t(`${runner.progress.done} of ${runner.progress.total} done`, `${runner.progress.done} sur ${runner.progress.total} terminées`)}</p> : null}
-            {sel.length ? <p className="note num">{fmtBytes(sel.reduce((n, p) => n + p.bytes.length, 0), lang)}</p> : null}
+            {sel.length ? <p className="note num">{fmtBytes(sel.reduce((n, p) => n + p.size, 0), lang)}</p> : null}
           </div>
           <div className="recipe-save">
             <label className="field">

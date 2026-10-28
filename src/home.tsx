@@ -11,7 +11,7 @@ import { WorkspacePage } from "./workspace-page.tsx";
 
 export async function addFiles(list: Iterable<File>) {
   const read = await readFiles(list);
-  if (read.length) workspace.add(read);
+  if (read.length) await workspace.add(read);
 }
 
 const FORMATS = "JPEG · PNG · HEIC · WebP · AVIF · JPEG XL · RAW · TIFF · GIF · SVG";

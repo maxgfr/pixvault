@@ -105,3 +105,21 @@ test("an iPhone HEIC shows its size and compresses to a format the browser can w
   await expect(results.locator(".result-name")).toContainText(/sample\.(webp|jpg)/);
   await w.assertClean();
 });
+
+test("stopping a batch leaves the app ready to run again", async ({ page }) => {
+  const w = await watch(page);
+  await drop(page, ["gps.jpg", "plain.jpg", "gps.jpg", "plain.jpg"]);
+  await page.goto("./#/convert");
+  await page.getByLabel("Convert to", { exact: true }).selectOption("avif");
+  await page.locator(".run-button").click();
+  await page.getByRole("button", { name: "Stop" }).click();
+  await expect(page.locator(".run-button")).toBeEnabled();
+  await expect(page.getByRole("region", { name: "Results" })).toHaveCount(0);
+  await page.getByLabel("Convert to", { exact: true }).selectOption("webp");
+  await page.locator(".run-button").click();
+  const results = page.getByRole("region", { name: "Results" });
+  await expect(results).toBeVisible({ timeout: 60_000 });
+  await expect(results.locator(".result-row")).toHaveCount(4);
+  await expect(results.locator(".error-text")).toHaveCount(0);
+  await w.assertClean();
+});

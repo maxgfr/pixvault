@@ -2,7 +2,7 @@
 // for the live before/after preview.
 
 import type { Options } from "../../tools/types.ts";
-import { decode, encode } from "../codecs.ts";
+import { decode, decodeScaled, encode } from "../codecs.ts";
 import { sniff } from "../formats.ts";
 import { readMeta } from "../meta/read.ts";
 import { clone, opaque, type Raster } from "../raster.ts";
@@ -28,15 +28,29 @@ interface Prepared {
 const prepared = new Map<string, Prepared>();
 const KEEP = 3;
 
+export const isPrepared = (key: string) => prepared.has(key);
+
+/** The photo reduced to `maxSide`: decoded at that size by the browser when it can, else decoded whole and resized. */
+export async function reduced(input: Input, maxSide: number, quality: ResizeQuality = "high"): Promise<{ r: Raster; width: number; height: number }> {
+  const scaled = await decodeScaled(input.bytes, input.name, maxSide, quality);
+  if (scaled) return { r: scaled.raster, width: scaled.width, height: scaled.height };
+  const full = await decode(input.bytes, input.name);
+  const { width, height } = fitSize(full.width, full.height, maxSide, maxSide, "inside", false);
+  return { r: await resize(full, width, height, "triangle"), width: full.width, height: full.height };
+}
+
+/** A workspace thumbnail and the photo's real (upright) size. */
+export async function thumbnail(input: Input, maxSide: number): Promise<{ before: Output; width: number; height: number }> {
+  const { r, width, height } = await reduced(input, maxSide, "medium");
+  return { before: await toFile(r), width, height };
+}
+
 async function prepare(input: Input, maxSide: number, key?: string): Promise<Prepared> {
   const hit = key ? prepared.get(key) : undefined;
   if (hit) return hit;
   const format = (sniff(input.bytes, input.name) ?? "png") as Prepared["format"];
-  const meta = await readMeta(input.bytes);
-  const full = await decode(input.bytes, input.name);
-  const { width, height } = fitSize(full.width, full.height, maxSide, maxSide, "inside", false);
-  const r = await resize(full, width, height, "triangle");
-  const p: Prepared = { r, meta, format, before: await toFile(r), width: full.width, height: full.height };
+  const [meta, { r, width, height }] = await Promise.all([readMeta(input.bytes), reduced(input, maxSide)]);
+  const p: Prepared = { r, meta, format, before: await toFile(r), width, height };
   if (key) {
     prepared.set(key, p);
     while (prepared.size > KEEP) prepared.delete(prepared.keys().next().value!);

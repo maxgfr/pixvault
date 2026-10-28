@@ -1,18 +1,21 @@
-// The photos you are working on, kept in memory only: nothing is stored,
-// and a reload empties it. Each photo gets an accession number, an upright
-// thumbnail and its details, read in workers as it arrives.
+// The photos you are working on, for this tab only: nothing is stored, and
+// a reload empties it. Photos are kept as the files themselves (Blobs, backed
+// by the disk for picked and dropped files), never copied into memory: the
+// workers read them when they work on them. Each photo gets an accession
+// number, an upright thumbnail and its details, read in workers as it arrives.
 
 import { useSyncExternalStore } from "react";
 import { type Format, sniff } from "./engine/formats.ts";
 import type { InspectReport } from "./engine/meta/read.ts";
-import { JobError, runBatch } from "./pool.ts";
+import { concurrency, JobError, runBatch } from "./pool.ts";
 
 export interface Photo {
   key: string;
   /** Accession number, in the order photos joined. */
   no: number;
   name: string;
-  bytes: Uint8Array;
+  file: Blob;
+  size: number;
   format: Format | null;
   thumb?: string;
   width?: number;
@@ -51,26 +54,29 @@ class Workspace {
     for (const fn of this.#listeners) fn();
   }
 
-  #patch(key: string, bytes: Uint8Array, patch: Partial<Photo>) {
+  #patch(key: string, file: Blob, patch: Partial<Photo>) {
     // Ignore late results for a photo that has since been replaced.
-    this.#set(this.#photos.map((p) => (p.key === key && p.bytes === bytes ? { ...p, ...patch } : p)));
+    this.#set(this.#photos.map((p) => (p.key === key && p.file === file ? { ...p, ...patch } : p)));
   }
 
-  #make(name: string, bytes: Uint8Array, unsaved?: boolean, no?: number): Photo {
-    const format = sniff(bytes, name);
+  #make(name: string, file: Blob, head: Uint8Array, unsaved?: boolean, no?: number): Photo {
+    const format = sniff(head, name);
     return {
       key: crypto.randomUUID(),
       no: no ?? ++this.#counter,
       name,
-      bytes,
+      file,
+      size: file.size,
       format,
       unsaved,
       problem: format ? undefined : { code: "unsupported", message: "not an image" },
     };
   }
 
-  add(items: { name: string; bytes: Uint8Array; unsaved?: boolean }[]): Photo[] {
-    const added = items.map((i) => this.#make(i.name, i.bytes, i.unsaved));
+  /** Only the first bytes are read here, to tell the format. */
+  async add(items: { name: string; file: Blob; unsaved?: boolean }[]): Promise<Photo[]> {
+    const heads = await Promise.all(items.map(async (i) => new Uint8Array(await i.file.slice(0, 4096).arrayBuffer())));
+    const added = items.map((i, k) => this.#make(i.name, i.file, heads[k]!, i.unsaved));
     this.#set([...this.#photos, ...added]);
     void this.#inspect(added.filter((p) => !p.problem));
     return added;
@@ -79,18 +85,18 @@ class Workspace {
   async #inspect(list: Photo[]) {
     if (!list.length) return;
     await runBatch(
-      list.map((p) => ({ kind: "thumb" as const, input: { name: p.name, bytes: p.bytes }, maxSide: 480 })),
+      list.map((p) => ({ kind: "thumb" as const, input: { name: p.name, blob: p.file }, maxSide: 480 })),
       {
-        workers: Math.min(2, list.length),
+        workers: Math.min(concurrency(), list.length),
         onSettled: (i, r) => {
           const p = list[i]!;
           if (r instanceof JobError) {
-            this.#patch(p.key, p.bytes, { problem: { code: r.code, message: r.message } });
+            this.#patch(p.key, p.file, { problem: { code: r.code, message: r.message } });
             return;
           }
           const thumb = r.files[0];
           const info = r.report as InspectReport;
-          this.#patch(p.key, p.bytes, {
+          this.#patch(p.key, p.file, {
             thumb: thumb ? URL.createObjectURL(new Blob([thumb.bytes as BlobPart], { type: thumb.mime })) : undefined,
             info,
             width: info?.width,
@@ -124,11 +130,12 @@ class Workspace {
   }
 
   /** Put a result in place of `key`, keeping the old photo one step back. */
-  replace(key: string, name: string, bytes: Uint8Array) {
+  async replace(key: string, name: string, file: Blob) {
     const old = this.get(key);
     if (!old) return;
     if (old.previous) release(old.previous);
-    const next: Photo = { ...this.#make(name, bytes, true, old.no), key: old.key, previous: { ...old, previous: undefined } };
+    const head = new Uint8Array(await file.slice(0, 4096).arrayBuffer());
+    const next: Photo = { ...this.#make(name, file, head, true, old.no), key: old.key, previous: { ...old, previous: undefined } };
     this.#set(this.#photos.map((p) => (p.key === key ? next : p)));
     void this.#inspect([next]);
   }

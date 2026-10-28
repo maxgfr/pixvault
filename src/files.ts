@@ -6,7 +6,8 @@ import { uniqueNames, zip } from "./engine/zip.ts";
 
 export interface InFile {
   name: string;
-  bytes: Uint8Array;
+  /** The file itself: picked and dropped files stay on disk until a worker reads them. */
+  file: Blob;
 }
 
 /** Read dropped items, walking into folders (any depth up to 8). */
@@ -59,15 +60,15 @@ export async function readFiles(list: Iterable<File>): Promise<InFile[]> {
   const out: InFile[] = [];
   for (const f of list) {
     const name = f.name || "pasted.png";
-    const bytes = new Uint8Array(await f.arrayBuffer());
-    if (sniff(bytes, name) === "svg") {
+    // Only SVG is read whole here (the page draws it); everything else stays a file.
+    if (sniff(new Uint8Array(await f.slice(0, 4096).arrayBuffer()), name) === "svg") {
       const png = await rasteriseSvg(f);
       if (png) {
-        out.push({ name: name.replace(/\.svg$/i, "") + ".png", bytes: png });
+        out.push({ name: name.replace(/\.svg$/i, "") + ".png", file: new Blob([png as BlobPart], { type: "image/png" }) });
         continue;
       }
     }
-    out.push({ name, bytes });
+    out.push({ name, file: f });
   }
   return out;
 }
@@ -131,7 +132,7 @@ export async function takeShared(): Promise<InFile[]> {
   for (const req of await inbox.keys()) {
     const res = await inbox.match(req);
     if (!res) continue;
-    out.push({ name: decodeURIComponent(res.headers.get("x-name") ?? "shared.jpg"), bytes: new Uint8Array(await res.arrayBuffer()) });
+    out.push({ name: decodeURIComponent(res.headers.get("x-name") ?? "shared.jpg"), file: await res.blob() });
   }
   await caches.delete("pixvault-inbox");
   return out;

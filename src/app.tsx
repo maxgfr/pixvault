@@ -44,7 +44,7 @@ export function App() {
   usePaste();
 
   useEffect(() => {
-    if (location.hash.includes("shared")) void takeShared().then((files) => files.length && workspace.add(files));
+    if (location.hash.includes("shared")) void takeShared().then((files) => (files.length ? workspace.add(files) : undefined));
   }, []);
 
   useEffect(() => {
