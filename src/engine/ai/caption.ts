@@ -5,7 +5,7 @@
 
 import { MODELS } from "../../ai/catalog.ts";
 import type { Raster } from "../raster.ts";
-import { hasWebGPU, modelFiles, ort } from "./runtime.ts";
+import { hasWebGPUf16, modelFiles, ort } from "./runtime.ts";
 
 // biome-ignore lint: Transformers.js types are heavy; this module only needs a few calls.
 type Any = any;
@@ -43,7 +43,7 @@ function load() {
     };
     env.backends.onnx.wasm.wasmPaths = { mjs: `${base}ort-wasm-simd-threaded.asyncify.mjs`, wasm: `${base}ort-wasm-simd-threaded.asyncify.wasm` };
     env.backends.onnx.wasm.numThreads = 1;
-    const device = (await hasWebGPU()) ? "webgpu" : "wasm";
+    const device = (await hasWebGPUf16()) ? "webgpu" : "wasm";
     const dtype = { vision_encoder: "q4", embed_tokens: "int8", encoder_model: "q4", decoder_model_merged: "q4" };
     const [model, processor] = await Promise.all([tf.Florence2ForConditionalGeneration.from_pretrained(m.repo, { dtype, device, local_files_only: true }), tf.AutoProcessor.from_pretrained(m.repo, { local_files_only: true })]);
     return { model, processor, tf };

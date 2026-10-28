@@ -3,7 +3,7 @@
 // Storage until removed. The worker reads them from there.
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { cacheKey, fileURL, MODEL_CACHE, MODELS, type ModelId } from "./catalog.ts";
+import { cacheKey, fileURL, type GpuSupport, MODEL_CACHE, MODELS, type ModelId } from "./catalog.ts";
 
 const base = () => location.href.split("#")[0]!;
 const listeners = new Set<() => void>();
@@ -89,23 +89,23 @@ export function useDownloaded(id: ModelId | null): boolean | null {
   return state;
 }
 
-let gpu: Promise<boolean> | undefined;
-/** WebGPU with half-precision shaders: what BiRefNet (fp16) needs. */
-export function pageHasWebGPU(): Promise<boolean> {
+let gpu: Promise<GpuSupport> | undefined;
+/** What this browser's WebGPU can run (the worker probes the same way). */
+export function pageGpu(): Promise<GpuSupport> {
   gpu ??= (async () => {
-    const nav = navigator as Navigator & { gpu?: { requestAdapter(): Promise<{ features: Set<string> } | null> } };
     try {
-      const adapter = nav.gpu ? await nav.gpu.requestAdapter() : null;
-      return Boolean(adapter?.features.has("shader-f16"));
+      const adapter = await navigator.gpu?.requestAdapter({ powerPreference: "high-performance" });
+      return { f16: Boolean(adapter?.features.has("shader-f16")), storage: adapter?.limits.maxStorageBuffersPerShaderStage ?? 0 };
     } catch {
-      return false;
+      return { f16: false, storage: 0 };
     }
   })();
   return gpu;
 }
 
-export function useWebGPU(): boolean | null {
-  const [v, setV] = useState<boolean | null>(null);
-  useEffect(() => void pageHasWebGPU().then(setV), []);
+/** null until known. */
+export function useGpu(): GpuSupport | null {
+  const [v, setV] = useState<GpuSupport | null>(null);
+  useEffect(() => void pageGpu().then(setV), []);
   return v;
 }

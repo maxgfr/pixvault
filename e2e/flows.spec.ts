@@ -92,3 +92,16 @@ test("the interface speaks French", async ({ page }) => {
   await page.getByRole("button", { name: "EN" }).click();
   await w.assertClean();
 });
+
+test("an iPhone HEIC shows its size and compresses to a format the browser can write", async ({ page }) => {
+  const w = await watch(page);
+  await drop(page, ["sample.heic"]);
+  await expect(page.locator(".mat .label-line")).toContainText("HEIC · 96×64");
+  await page.goto("./#/compress");
+  await page.locator(".run-button").click();
+  const results = page.getByRole("region", { name: "Results" });
+  await expect(results).toBeVisible({ timeout: 60_000 });
+  await expect(results).toContainText("cannot be written in a browser");
+  await expect(results.locator(".result-name")).toContainText(/sample\.(webp|jpg)/);
+  await w.assertClean();
+});

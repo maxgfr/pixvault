@@ -15,7 +15,8 @@ export function BrushEditor({ src, onMask }: { src: string; onMask: (png: Uint8A
     const img = new Image();
     img.onload = () => {
       const c = canvas.current;
-      if (!c) return;
+      // The same photo again (a refreshed preview): keep what was painted.
+      if (!c || (c.width === img.naturalWidth && c.height === img.naturalHeight)) return;
       c.width = img.naturalWidth;
       c.height = img.naturalHeight;
       setPainted(false);

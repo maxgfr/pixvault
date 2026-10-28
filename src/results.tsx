@@ -21,6 +21,7 @@ const NOTES: Record<CompressNote, [string, string]> = {
   downscaled: ["Shrunk to reach the target size", "Réduite pour atteindre le poids visé"],
   "target-missed": ["Could not reach the target size", "Impossible d'atteindre le poids visé"],
   "lossless-jpeg": ["JPEG cannot be recompressed losslessly: original kept", "Un JPEG ne se recompresse pas sans perte : original conservé"],
+  "source-unwritable": ["This format cannot be written in a browser: saved in the most compact one that can", "Ce format ne s'écrit pas dans un navigateur : enregistré dans le plus compact possible"],
 };
 
 interface Row {

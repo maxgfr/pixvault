@@ -76,3 +76,15 @@ test("convert writes every format", async () => {
   expect(new TextDecoder().decode(pdf.files[0]!.bytes.subarray(0, 5))).toBe("%PDF-");
   expect(pdf.files[0]!.name).toBe("s.pdf");
 });
+
+test("compressing a HEIC 'as the same format' picks the most compact writable one and says why", async () => {
+  const { runTool } = await import("./index.ts");
+  const bytes = new Uint8Array(await Bun.file(new URL("../../../fixtures/sample.heic", import.meta.url)).arrayBuffer());
+  const ctx = { progress() {}, check() {} };
+  const keepMeta = await runTool("compress", [{ name: "IMG_0001.HEIC", bytes }], { mode: "quality", quality: 78, format: "keep", metadata: "no-gps" }, ctx);
+  const r = (keepMeta.report as { format: string; note?: string }[])[0]!;
+  expect(["webp", "jpeg"]).toContain(r.format);
+  expect(r.note).toBe("source-unwritable");
+  const strip = await runTool("compress", [{ name: "IMG_0001.HEIC", bytes }], { mode: "quality", quality: 78, format: "keep", metadata: "strip" }, ctx);
+  expect(["webp", "jpeg", "avif"]).toContain((strip.report as { format: string }[])[0]!.format);
+});

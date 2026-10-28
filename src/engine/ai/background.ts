@@ -1,18 +1,20 @@
 // Background removal: an alpha matte from BiRefNet lite (WebGPU with
-// half-precision shaders) or MODNet (everywhere else), then the subject on transparency, a colour or a
+// half-precision shaders and 11 storage buffers per shader) or MODNet
+// (everywhere else), then the subject on transparency, a colour or a
 // blurred copy of the photo.
 
 import { parseColor, raster, type Raster } from "../raster.ts";
 import { gaussianBlur } from "../ops/blur.ts";
 import { resize } from "../resize.ts";
-import { hasWebGPUf16, ort, session, toCHW } from "./runtime.ts";
+import { backgroundModel } from "../../ai/catalog.ts";
+import { gpuSupport, ort, session, toCHW } from "./runtime.ts";
 
 const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
 
 /** The matte as an 8-bit alpha plane at the photo's size (255 = subject). */
 export async function matte(r: Raster, prefer?: "background" | "background-lite"): Promise<Uint8ClampedArray> {
   const o = await ort();
-  const id = prefer ?? ((await hasWebGPUf16()) ? "background" : "background-lite");
+  const id = prefer ?? backgroundModel(await gpuSupport());
   const s = await session(id);
   let w: number;
   let h: number;

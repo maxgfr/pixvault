@@ -1,39 +1,38 @@
 ---
 name: pixvault
-description: A museum print room for your photos — mat board, archival blue-grey, graphite, one conservation red.
+description: A white gallery for your photos — white mats on a cool wall, an ink bar, one vermilion for the action.
 colors:
-  ground: "#e8e5de"
-  surface: "#fbfaf7"
-  surface-2: "#f2f0ea"
+  ground: "#f5f5f3"
+  surface: "#ffffff"
+  surface-2: "#f0f0ee"
   core: "#ffffff"
-  bevel-hi: "#ffffff"
-  bevel-lo: "#d9d3c7"
-  line: "#d6d0c4"
-  line-soft: "#e6e1d8"
-  ink: "#22282d"
-  ink-2: "#454d54"
-  muted: "#5c6369"
-  box: "#566d7a"
-  box-deep: "#435763"
-  box-text: "#435763"
-  box-ink: "#f3f5f6"
-  box-soft: "#dde4e8"
-  red: "#b0442b"
-  red-deep: "#943620"
-  red-ink: "#ffffff"
-  red-soft: "#f4e3dc"
-  gain: "#2f6b45"
+  bevel-hi: "#fafaf9"
+  bevel-lo: "#e2e2df"
+  line: "#e3e3e0"
+  line-soft: "#ededeb"
+  ink: "#17191c"
+  ink-2: "#3d4046"
+  muted: "#5f6368"
+  bar: "#15171a"
+  bar-deep: "#2b2e33"
+  bar-ink: "#ffffff"
+  badge: "#eeeeec"
+  vermilion: "#ff5a36"
+  vermilion-hover: "#ff7352"
+  vermilion-ink: "#15171a"
+  vermilion-text: "#cc3a17"
+  vermilion-soft: "#ffe8e1"
+  gain: "#1f7a4a"
   loss: "#9a5a00"
   gps: "#8a5300"
-  gps-soft: "#f6e9cf"
-  error: "#a3271c"
-  focus: "#2f6f9a"
-  dark-ground: "#171a1c"
-  dark-surface: "#212629"
-  dark-ink: "#e7e4dd"
-  dark-box: "#2f3d45"
-  dark-box-text: "#a9c6d6"
-  dark-red: "#e0775c"
+  gps-soft: "#fdf0d5"
+  error: "#c0261b"
+  focus: "#1f6feb"
+  dark-ground: "#0e0f11"
+  dark-surface: "#17191c"
+  dark-ink: "#ededeb"
+  dark-bar: "#08090a"
+  dark-vermilion: "#ff6a45"
 typography:
   display:
     fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif"
@@ -75,20 +74,20 @@ spacing:
   xl: "3.5rem"
 components:
   button-primary:
-    backgroundColor: "{colors.red}"
-    textColor: "{colors.red-ink}"
+    backgroundColor: "{colors.vermilion}"
+    textColor: "{colors.vermilion-ink}"
     rounded: "{rounded.md}"
     padding: "0.5rem 0.95rem"
     height: "2.5rem"
   button-primary-hover:
-    backgroundColor: "{colors.red-deep}"
+    backgroundColor: "{colors.vermilion-hover}"
   button-secondary:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.ink}"
     rounded: "{rounded.md}"
   shell-bar:
-    backgroundColor: "{colors.box}"
-    textColor: "{colors.box-ink}"
+    backgroundColor: "{colors.bar}"
+    textColor: "{colors.bar-ink}"
     height: "3.5rem"
   mat:
     backgroundColor: "{colors.surface}"
@@ -104,18 +103,18 @@ components:
 
 ## Overview
 
-A working tool dressed as a museum photography print room. Every photo the user drops is treated as a piece in a collection: it sits in its own **mat with a bevel-cut window**, carries an **accession number** (PV-001) in small caps, and every change is reported like a condition report (before → after, with the gain). The interface is otherwise a plain, familiar web app (Operate mode): top bar, a grid, a side column of actions, standard form controls. The world contributes only palette, type voice, density and the one signature move — the bevelled window.
+A working tool laid out like a white-walled photo gallery. Every photo the user drops is treated as a piece in a collection: it sits in its own **white mat with a bevel-cut window**, carries an **accession number** (PV-001) in small caps, and every change is reported like a condition report (before → after, with the gain). The interface is otherwise a plain, familiar web app (Operate mode): top bar, a grid, a side column of actions, standard form controls. The world contributes only palette, type voice, density and the one signature move — the bevelled window.
 
-Colour is quarantined: the chrome is mat board, graphite and archival blue-grey, so the only saturated colours on screen are the photographs themselves and the state colours.
+Colour is quarantined: the chrome is white, cool off-white and ink, so the only saturated colours on screen are the photographs, the vermilion of the next action, and the state colours. (The first version used warm mat board, archival blue-grey and brick red; it read dated and was replaced by this palette.)
 
 ## Colors
 
-- **Mat board** (`ground`, `surface`, `surface-2`, `core`): warm greys and off-whites, like acid-free board. `surface` is the face of a mat; `core` the white core exposed by a bevel and the field of inputs.
-- **Archival box blue-grey** (`box`, `box-deep`, `box-text`): the shell bar, current navigation, links, icons, category headings — the colour of conservation storage boxes.
-- **Graphite** (`ink`, `ink-2`, `muted`): all text. `muted` passes 4.5:1 on every light ground (4.85:1 on `ground`).
-- **Conservation red** (`red`, `red-deep`): reserved for what is about to happen or change — the primary run button, selection ticks, the before/after divider, drawn crop and redact areas, the drop target when files hover. Never decoration.
-- **States**: `gain` (smaller file), `loss` (bigger file), `gps`/`gps-soft` (a photo reveals its location; also risk panels), `error`, `focus`.
-- **Dark theme** follows the system: an archive at night — near-black board, deep blue-grey bar, warm off-white ink, a lighter red that keeps contrast.
+- **Wall and mats** (`ground`, `surface`, `surface-2`, `core`): a cool off-white wall (`#f5f5f3`) with pure white mats and fields.
+- **Ink bar** (`bar`, `bar-deep`, `bar-ink`): the top bar and current navigation, near-black with white text; the brand mark's window is vermilion.
+- **Ink** (`ink`, `ink-2`, `muted`): all text and links (underlined). `muted` passes 4.5:1 on the wall (5.5:1) and on white (6:1).
+- **Vermilion** (`vermilion`, `vermilion-hover`): reserved for what is about to happen or change — the primary run button (ink text on it, 5.8:1), selection ticks, the before/after divider, drawn crop and redact areas, the drop target while files hover. Never decoration, never text (use `vermilion-text` if ever needed).
+- **States**: `gain` (smaller file), `loss` (bigger file), `gps`/`gps-soft` (a photo reveals its location; also risk panels), `error`, `focus` (blue ring).
+- **Dark theme** follows the system: near-black wall, dark grey mats, an even darker bar, a lighter vermilion with black text.
 
 ## Typography
 
@@ -131,7 +130,7 @@ One system sans for everything (no web fonts: the CSP loads nothing from elsewhe
 
 ## Elevation & Depth
 
-Mats rest on the table: a two-layer soft shadow (`0 1px 1px` + `0 4px 10px -4px`, warm-tinted). A lifted state (drag over, a mat settling in) uses a deeper `0 12px 28px -10px`. Inside a mat, depth comes only from the bevel. No other shadows; no borders under shadows.
+Mats hang on the wall: a two-layer soft neutral shadow (`0 1px 2px` + `0 6px 16px -8px`). A lifted state (drag over, a mat settling in) uses a deeper `0 12px 28px -10px`. Inside a mat, depth comes only from the bevel. No other shadows; no borders under shadows.
 
 ## Shapes
 
@@ -139,17 +138,17 @@ Board is cut square: mats and stages have 2px corners, controls 3–4px, chips a
 
 ## Components
 
-- **Mat**: selection tick (top-left, red when checked), bevelled window with the upright thumbnail, accession number, badges (GPS, Changed), file name, label line (format · size · weight), and quiet icon tools (details, restore, move, remove). Unselected mats dim to 40% and desaturate.
-- **Drop mat**: a large mat whose window is the drop target; turns red-tinted while files hover.
-- **Quick action**: icon + title + two-line summary, `core` background, red border on hover.
-- **Compare**: before/after on one picture, a red divider with a round knob, driven by an invisible range input (keyboard accessible).
-- **Rect and brush editors**: red outlines and handles; crop shades outside the frame, redact tints inside.
+- **Mat**: selection tick (top-left, vermilion when checked), bevelled window with the upright thumbnail, accession number, badges (GPS, Changed), file name, label line (format · size · weight), and quiet icon tools (details, restore, move, remove). Unselected mats dim to 40% and desaturate.
+- **Drop mat**: a large mat whose window is the drop target; turns vermilion-tinted while files hover.
+- **Quick action**: icon + title + two-line summary, white background, vermilion border on hover.
+- **Compare**: before/after on one picture, a vermilion divider with a round knob, driven by an invisible range input (keyboard accessible).
+- **Rect and brush editors**: vermilion outlines and handles; crop shades outside the frame, redact tints inside.
 - **Results**: a condition-report table — thumbnail, accession, before → after, gain in green or loss in amber, per-file actions; bulk actions above.
-- **Model gate**: a bevelled panel stating model, licence, size and origin, with one red download button.
+- **Model gate**: a bevelled panel stating model, licence, size and origin, with one vermilion download button.
 
 ## Do's and Don'ts
 
-- Do keep red for the action about to run and what it will change. Don't use it for decoration, headings or categories.
+- Do keep vermilion for the action about to run and what it will change. Don't use it for decoration, headings, categories or text.
 - Do let photographs be the colour. Don't add tinted backgrounds or gradients behind them.
 - Do use standard controls (selects, ranges, checkboxes) themed with `accent-color`. Don't invent widgets for the world's sake.
 - Do write every string in English and French, side by side in the code.
