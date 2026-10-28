@@ -31,7 +31,6 @@
     "libheif-js": "^1.23.5",
     "omggif": "^1.0.10",
     "pdf-lib": "^1.17.1",
-    "piexifjs": "^1.0.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "utif2": "^4.1.0"
