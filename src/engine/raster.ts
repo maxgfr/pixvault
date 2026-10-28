@@ -37,16 +37,20 @@ export function fromImageData(img: { width: number; height: number; data: ArrayL
   return { width: img.width, height: img.height, data };
 }
 
-/** True when every pixel is fully opaque. */
+/**
+ * True when no pixel shows real transparency. Alpha ≥ 250 counts as opaque:
+ * HEIC and some PNG exports carry an alpha plane with stray 254s that no one
+ * can see, and treating them as transparent would turn photos into PNGs.
+ */
 export function opaque(r: Raster): boolean {
   const d = r.data;
-  for (let i = 3; i < d.length; i += 4) if (d[i] !== 255) return false;
+  for (let i = 3; i < d.length; i += 4) if (d[i]! < 250) return false;
   return true;
 }
 
 /** Flatten transparency onto a solid colour (for formats without alpha). */
 export function flatten(r: Raster, bg: [number, number, number] = [255, 255, 255]): Raster {
-  if (opaque(r)) return r;
+  if (r.data.every((v, i) => i % 4 !== 3 || v === 255)) return r;
   const out = clone(r);
   const d = out.data;
   for (let i = 0; i < d.length; i += 4) {

@@ -4,6 +4,7 @@
 // is done, which frees all its memory at once.
 
 import { DecodeError } from "./engine/errors.ts";
+import { inspect } from "./engine/meta/read.ts";
 import { type RecipeStep, runRecipe, runTool } from "./engine/run/index.ts";
 import { preview } from "./engine/run/preview.ts";
 import type { Ctx, Input, Output } from "./engine/run/types.ts";
@@ -12,7 +13,9 @@ import type { Options } from "./tools/types.ts";
 export type JobRequest =
   | { id: number; kind: "tool"; tool: string; inputs: Input[]; options: Options }
   | { id: number; kind: "recipe"; steps: RecipeStep[]; output: Options; inputs: Input[] }
-  | { id: number; kind: "preview"; steps: RecipeStep[]; input: Input; maxSide: number };
+  | { id: number; kind: "preview"; steps: RecipeStep[]; input: Input; maxSide: number }
+  /** A small upright preview of a photo plus its details, when it joins the workspace. */
+  | { id: number; kind: "thumb"; input: Input; maxSide: number };
 
 export type JobMessage =
   | { id: number; type: "progress"; done: number; total: number; label?: string }
@@ -29,6 +32,11 @@ scope.onmessage = async (e: MessageEvent<JobRequest>) => {
     check: () => {},
   };
   try {
+    if (req.kind === "thumb") {
+      const [{ before }, report] = await Promise.all([preview(req.input, [], req.maxSide, ctx, true), inspect(req.input.bytes, req.input.name)]);
+      post({ id: req.id, type: "done", files: [before], report }, [before.bytes.buffer as ArrayBuffer]);
+      return;
+    }
     if (req.kind === "preview") {
       const { before, after } = await preview(req.input, req.steps, req.maxSide, ctx);
       post({ id: req.id, type: "done", files: [after], before }, [after.bytes.buffer as ArrayBuffer, before.bytes.buffer as ArrayBuffer]);
