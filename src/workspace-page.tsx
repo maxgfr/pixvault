@@ -41,7 +41,7 @@ function Mat({ p, selected, index, count }: { p: Photo; selected: boolean; index
         ) : (
           <p className="label-line num">
             {fmt}
-            {p.width ? ` · ${p.width}×${p.height}` : ""} · {bytes(p.bytes.length, lang)}
+            {p.width ? ` · ${p.width}×${p.height}` : ""} · {bytes(p.size, lang)}
           </p>
         )}
       </div>
@@ -81,7 +81,7 @@ export function WorkspacePage() {
   const [over, setOver] = useState(false);
   const quick = quickActions(sel);
   const more = moreActions(sel, quick);
-  const total = photos.reduce((n, p) => n + p.bytes.length, 0);
+  const total = photos.reduce((n, p) => n + p.size, 0);
   const located = sel.filter(hasGps).length;
   const reading = photos.filter((p) => !p.thumb && !p.problem).length;
 

@@ -218,3 +218,40 @@ export async function encodePngFast(r: Raster): Promise<Uint8Array> {
   await png();
   return pngEncode(new Uint8Array(r.data.buffer, r.data.byteOffset, r.data.byteLength), r.width, r.height, 8).slice();
 }
+
+// Formats the browser decodes everywhere (HEIC only in Safari goes the wasm way).
+const NATIVE_SCALED = new Set<Format>(["jpeg", "png", "webp", "gif", "bmp", "avif"]);
+
+/**
+ * The photo decoded straight at a reduced size by the browser (JPEG decoders
+ * skip most of the work when scaling down), upright, for thumbnails and
+ * previews. Null when this browser or format cannot, or when the result does
+ * not match what the header says (then decode fully).
+ */
+export async function decodeScaled(bytes: Uint8Array, name: string, maxSide: number, quality: ResizeQuality = "high"): Promise<{ raster: Raster; width: number; height: number } | null> {
+  if (typeof createImageBitmap !== "function" || typeof OffscreenCanvas !== "function") return null;
+  const format = sniff(bytes, name);
+  if (!format || !NATIVE_SCALED.has(format)) return null;
+  const { dimensions } = await import("./meta/containers.ts");
+  const d = dimensions(bytes, format);
+  if (!d || !d.width || !d.height) return null;
+  const orientation = format === "jpeg" ? (await import("./meta/jpeg.ts")).jpegOrientation(bytes) : 1;
+  const [width, height] = orientation >= 5 ? [d.height, d.width] : [d.width, d.height];
+  if (width * height > MAX_PIXELS) throw new DecodeError(`${width}×${height} is too large to process here`, "too-large");
+  const scale = Math.min(1, maxSide / Math.max(width, height));
+  const tw = Math.max(1, Math.round(width * scale));
+  const th = Math.max(1, Math.round(height * scale));
+  try {
+    const bitmap = await createImageBitmap(new Blob([bytes as BlobPart], { type: FORMATS[format].mime }), { imageOrientation: "from-image", premultiplyAlpha: "none", resizeWidth: tw, resizeHeight: th, resizeQuality: quality });
+    try {
+      if (bitmap.width !== tw || bitmap.height !== th) return null;
+      const ctx = new OffscreenCanvas(tw, th).getContext("2d", { willReadFrequently: true })!;
+      ctx.drawImage(bitmap, 0, 0);
+      return { raster: fromImageData(ctx.getImageData(0, 0, tw, th)), width, height };
+    } finally {
+      bitmap.close();
+    }
+  } catch {
+    return null;
+  }
+}

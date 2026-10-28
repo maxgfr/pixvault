@@ -15,7 +15,7 @@ import { FieldList, missing } from "./fields.tsx";
 import { DropMat } from "./home.tsx";
 import { bytes, delta, errorText, photos as nPhotos, useLang } from "./i18n.ts";
 import { Icon } from "./icons.tsx";
-import { JobError, Previewer, runBatch } from "./pool.ts";
+import { JobError, Previewer, prewarm, runBatch } from "./pool.ts";
 import { Reports } from "./reports.tsx";
 import { Results } from "./results.tsx";
 import { useRunner } from "./run.ts";
@@ -61,18 +61,18 @@ function usePreview(tool: ToolDef, photo: Photo | undefined, options: Options, m
     const timer = setTimeout(
       async () => {
         try {
-          const input = { name: photo.name, bytes: photo.bytes };
+          const input = { name: photo.name, blob: photo.file };
           if (kind === "encode") {
             const r = await previewer.current!.request({ kind: "tool", tool: tool.id, inputs: [input], options });
             if (!r || !live) return;
             const out = r.files[0];
-            const before = photo.format && NATIVE.has(photo.format) ? blobURL(photo.bytes, "image/" + photo.format) : photo.thumb;
+            const before = photo.format && NATIVE.has(photo.format) ? URL.createObjectURL(photo.file) : photo.thumb;
             const after = out && /^image\/(jpeg|png|webp|gif|avif)$/.test(out.mime) ? blobURL(out.bytes, out.mime) : undefined;
             urls = [before, after].filter((u): u is string => Boolean(u) && u !== photo.thumb);
             setState({ before, after, size: out?.bytes.length, busy: false });
           } else {
             const steps = kind === "step" ? [{ tool: tool.id, options }] : [];
-            const r = await previewer.current!.request({ kind: "preview", steps, input, maxSide: 1400, key: `${photo.key}:${photo.bytes.length}:1400` });
+            const r = await previewer.current!.request({ kind: "preview", steps, input, maxSide: 1400, key: `${photo.key}:${photo.size}:1400` });
             if (!r || !live) return;
             const before = r.before ? blobURL(r.before.bytes, r.before.mime) : undefined;
             const after = kind === "step" && r.files[0] ? blobURL(r.files[0].bytes, r.files[0].mime) : undefined;
@@ -92,7 +92,7 @@ function usePreview(tool: ToolDef, photo: Photo | undefined, options: Options, m
       setTimeout(() => urls.forEach((u) => URL.revokeObjectURL(u)), 4000);
     };
     // A plain preview shows the photo itself: it must not reload (and clear a brush) when the model arrives.
-  }, [photo?.key, photo?.bytes, kind, key, tool.id, kind === "plain" ? false : modelReady]);
+  }, [photo?.key, photo?.file, kind, key, tool.id, kind === "plain" ? false : modelReady]);
   return state;
 }
 
@@ -132,7 +132,7 @@ export function ToolView({ tool }: { tool: ToolDef }) {
     try {
       const { describeWithApi } = await import("./ai/byok.ts");
       const small = await runBatch(
-        sel.map((p) => ({ kind: "preview" as const, steps: [], input: { name: p.name, bytes: p.bytes }, maxSide: 1024 })),
+        sel.map((p) => ({ kind: "preview" as const, steps: [], input: { name: p.name, blob: p.file }, maxSide: 1024 })),
         { workers: 2 },
       );
       const captions = new Map<string, string>();
@@ -151,6 +151,11 @@ export function ToolView({ tool }: { tool: ToolDef }) {
   useEffect(() => {
     remembered.set(tool.id, options);
   }, [tool.id, options]);
+
+  // Workers start and warm up while the settings are being chosen.
+  useEffect(() => {
+    if (sel.length) prewarm(tool.input === "images" ? 1 : sel.length);
+  }, [tool.id, sel.length]);
 
   const set = (name: string, v: OptionValue) => setOptions((o) => ({ ...o, [name]: v }));
   const lacking = missing(fields, options);
@@ -224,8 +229,8 @@ export function ToolView({ tool }: { tool: ToolDef }) {
                 {!preview.busy && preview.size !== undefined ? (
                   <>
                     {t("This photo: ", "Cette photo : ")}
-                    {bytes(photo.bytes.length, lang)} → <strong>{bytes(preview.size, lang)}</strong>{" "}
-                    <span className={preview.size < photo.bytes.length ? "gain" : "loss"}>{delta(photo.bytes.length, preview.size, lang)}</span>
+                    {bytes(photo.size, lang)} → <strong>{bytes(preview.size, lang)}</strong>{" "}
+                    <span className={preview.size < photo.size ? "gain" : "loss"}>{delta(photo.size, preview.size, lang)}</span>
                   </>
                 ) : null}
                 {tool.id === "upscale" ? t("Upscaling runs tile by tile: it can take a few minutes without WebGPU.", "L'agrandissement se fait tuile par tuile : comptez quelques minutes sans WebGPU.") : null}

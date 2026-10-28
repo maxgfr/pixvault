@@ -3,7 +3,7 @@
 // `--serve` then serves dist/ under /pixvault/ like GitHub Pages does.
 import { createHash } from "node:crypto";
 import { cp, mkdir, readdir, rm, stat } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { MODELS } from "../src/ai/catalog.ts";
 import { WASM } from "../src/engine/wasm.ts";
 
@@ -100,10 +100,37 @@ for await (const p of walk(dist)) {
   hash.update(rel).update(new Uint8Array(await Bun.file(p).arrayBuffer()));
 }
 files.sort();
-// The everyday codecs are cached at install; the rarer ones (AVIF, JPEG XL,
-// HEIC, QOI) and the AI runtime the first time a photo needs them.
+// What the app needs to open, found by following static imports from the
+// page and the worker; code loaded on demand (AI, PDF, the AI providers…) is
+// cached only once used, like the rarer codecs.
+async function staticGraph(entries: string[]): Promise<Set<string>> {
+  const seen = new Set<string>();
+  const queue = [...entries];
+  while (queue.length) {
+    const rel = queue.pop()!;
+    if (seen.has(rel)) continue;
+    seen.add(rel);
+    if (!rel.endsWith(".js")) continue;
+    const code = await Bun.file(join(dist, rel)).text();
+    // `import{a}from"./x.js"` and `import"./x.js"`; never `import("./x.js")`.
+    for (const m of code.matchAll(/(?:\bfrom|\bimport)\s*["'](\.{1,2}\/[^"']+\.js)["']/g)) {
+      queue.push(relative(dist, join(dist, dirname(rel), m[1]!)));
+    }
+  }
+  return seen;
+}
+const shell = await Bun.file(`${dist}/index.html`).text();
+const pageEntries = [...shell.matchAll(/(?:src|href)="\.\/(assets\/[^"]+)"/g)].map((m) => m[1]!);
+const eagerCode = await staticGraph([...pageEntries, "worker.js"]);
 const EAGER_WASM = new Set(["jpeg-enc", "jpeg-dec", "webp-enc", "webp-dec", "png", "oxipng", "resize"]);
-const lazy = files.filter((f) => (f.startsWith("wasm/") && !EAGER_WASM.has(f.slice(5, -5))) || f.startsWith("ort/") || /^assets\/w-(ai|transformers|ort|pdf)[\w-]*\.js$/.test(f));
+// The worker's small on-demand chunks (resizing, metadata, HEIC…) are needed offline from the start;
+// its big optional ones (Transformers.js, ONNX Runtime, pdf-lib) and the page's AI chunks wait.
+const BIG = 150 * 1024;
+const optional = async (f: string) => !eagerCode.has(f) && (!f.startsWith("assets/w-") || (await stat(`${dist}/${f}`)).size > BIG);
+const lazy: string[] = [];
+for (const f of files) {
+  if ((f.startsWith("wasm/") && !EAGER_WASM.has(f.slice(5, -5))) || f.startsWith("ort/") || (f.startsWith("assets/") && f.endsWith(".js") && (await optional(f)))) lazy.push(f);
+}
 // Models stay out of both lists: only the user's "Download" puts them on the device.
 const precache = ["./", ...files.filter((f) => f !== "index.html" && !f.startsWith("models/") && !lazy.includes(f))];
 const manifest = { version: hash.digest("hex").slice(0, 16), precache, lazy };

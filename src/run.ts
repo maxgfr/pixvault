@@ -24,7 +24,7 @@ export interface Progress {
 
 export type Plan = { tool: ToolDef; options: Options; perPhoto?: (p: Photo, i: number) => Options } | { recipe: RecipeStep[]; output: Options };
 
-const input = (p: Photo) => ({ name: p.name, bytes: p.bytes });
+const input = (p: Photo) => ({ name: p.name, blob: p.file });
 
 function jobsFor(plan: Plan, photos: Photo[]): { job: Job; inputs: Photo[] }[] {
   if ("recipe" in plan) return photos.map((p) => ({ job: { kind: "recipe", steps: plan.recipe, output: plan.output, inputs: [input(p)] }, inputs: [p] }));
@@ -57,8 +57,11 @@ export function useRunner() {
         },
       },
     );
+    const stopped = abort.current?.signal.aborted;
     abort.current = null;
     setProgress(null);
+    // Stopped on purpose: back to the settings, no list of "cancelled" rows.
+    if (stopped) return null;
     const next = results.map((r, i) => (r instanceof JobError ? { inputs: jobs[i]!.inputs, files: [], error: r } : { inputs: jobs[i]!.inputs, files: r.files, report: r.report }));
     setOutcomes(next);
     return next;
