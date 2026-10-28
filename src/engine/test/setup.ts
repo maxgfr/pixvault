@@ -1,9 +1,18 @@
 // Tests read the wasm modules straight from node_modules.
+import { registerFonts } from "../ops/vector.ts";
 import { setWasmLoader, WASM } from "../wasm.ts";
 import { raster, type Raster } from "../raster.ts";
 
 const root = new URL("../../../node_modules/", import.meta.url).pathname;
 setWasmLoader(async (name) => WebAssembly.compile(await Bun.file(root + WASM[name]).arrayBuffer()));
+
+// No canvas here: text is drawn from the fonts the command line ships.
+const fonts = new URL("../../../assets/fonts/", import.meta.url).pathname;
+registerFonts({
+  sans: new Uint8Array(await Bun.file(`${fonts}LiberationSans-Bold.ttf`).arrayBuffer()),
+  serif: new Uint8Array(await Bun.file(`${fonts}LiberationSerif-Bold.ttf`).arrayBuffer()),
+  mono: new Uint8Array(await Bun.file(`${fonts}LiberationMono-Bold.ttf`).arrayBuffer()),
+});
 
 /** A colourful test image: gradients plus a few hard edges, optionally with alpha. */
 export function sample(width = 64, height = 48, alpha = false): Raster {

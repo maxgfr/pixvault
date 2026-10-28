@@ -57,7 +57,17 @@ export const aiTools: ToolDef[] = [
     model: "inpaint",
     editor: "erase",
     aliases: ["inpaint", "remove object", "magic eraser", "clean up", "retouch", "gomme", "effacer", "retirer", "nettoyer"],
-    fields: [],
+    fields: [
+      {
+        name: "mask",
+        kind: "file",
+        accept: "image/*",
+        required: true,
+        advanced: true,
+        label: q("Mask image (white = erase)", "Image masque (blanc = effacer)"),
+        help: q("Painted with the brush here; on the command line, a black and white image.", "Peinte au pinceau ici ; en ligne de commande, une image noir et blanc."),
+      },
+    ],
   },
   {
     id: "smart-crop",

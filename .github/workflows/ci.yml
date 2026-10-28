@@ -1,8 +1,8 @@
 name: CI
 
 # Every gate on every push: tsc, oxlint, bun test, the site build and its
-# no-network check, Playwright end to end, and osv-scanner. The site
-# artifact built here is what Pages deploys.
+# no-network check, Playwright end to end, the compiled CLI against its own
+# tests, and osv-scanner. The site artifact built here is what Pages deploys.
 
 on:
   push:
@@ -50,6 +50,24 @@ jobs:
           path: dist
           include-hidden-files: true
           retention-days: 7
+
+  cli:
+    name: Command line (compiled binary)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - run: bun install --frozen-lockfile
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: models
+          key: models-${{ hashFiles('scripts/fetch-models.ts', 'src/ai/catalog.ts') }}
+      - run: bun run fetch-models
+      - run: bun scripts/cli-binaries.ts linux-x64
+      - name: The CLI tests, run by the binary itself
+        run: bun test src/cli
+        env:
+          PIXVAULT_BIN: dist-cli/pixvault-linux-x64
 
   osv:
     name: Known vulnerabilities (osv-scanner)
