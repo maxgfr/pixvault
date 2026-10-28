@@ -13,7 +13,7 @@ import type { Options } from "./tools/types.ts";
 export type JobRequest =
   | { id: number; kind: "tool"; tool: string; inputs: Input[]; options: Options }
   | { id: number; kind: "recipe"; steps: RecipeStep[]; output: Options; inputs: Input[] }
-  | { id: number; kind: "preview"; steps: RecipeStep[]; input: Input; maxSide: number }
+  | { id: number; kind: "preview"; steps: RecipeStep[]; input: Input; maxSide: number; key?: string }
   /** A small upright preview of a photo plus its details, when it joins the workspace. */
   | { id: number; kind: "thumb"; input: Input; maxSide: number };
 
@@ -39,7 +39,7 @@ scope.onmessage = async (e: MessageEvent<JobRequest>) => {
       return;
     }
     if (req.kind === "preview") {
-      const { before, after } = await preview(req.input, req.steps, req.maxSide, ctx);
+      const { before, after } = await preview(req.input, req.steps, req.maxSide, ctx, false, req.key);
       post({ id: req.id, type: "done", files: [after], before }, [after.bytes.buffer as ArrayBuffer, before.bytes.buffer as ArrayBuffer]);
       return;
     }

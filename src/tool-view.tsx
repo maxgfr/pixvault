@@ -72,7 +72,7 @@ function usePreview(tool: ToolDef, photo: Photo | undefined, options: Options, m
             setState({ before, after, size: out?.bytes.length, busy: false });
           } else {
             const steps = kind === "step" ? [{ tool: tool.id, options }] : [];
-            const r = await previewer.current!.request({ kind: "preview", steps, input, maxSide: 1400 });
+            const r = await previewer.current!.request({ kind: "preview", steps, input, maxSide: 1400, key: `${photo.key}:${photo.bytes.length}:1400` });
             if (!r || !live) return;
             const before = r.before ? blobURL(r.before.bytes, r.before.mime) : undefined;
             const after = kind === "step" && r.files[0] ? blobURL(r.files[0].bytes, r.files[0].mime) : undefined;
@@ -83,7 +83,7 @@ function usePreview(tool: ToolDef, photo: Photo | undefined, options: Options, m
           if (live) setState({ busy: false, error: e instanceof JobError ? errorText(e.code, e.message) : String(e) });
         }
       },
-      kind === "encode" ? 450 : 160,
+      kind === "encode" ? 450 : 60,
     );
     return () => {
       live = false;
