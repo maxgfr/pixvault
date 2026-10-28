@@ -111,3 +111,59 @@ export async function runOne(job: Job, signal?: AbortSignal): Promise<JobDone> {
   if (r instanceof JobError) throw r;
   return r!;
 }
+
+/**
+ * One long-lived worker for live previews: codecs stay warm between slider
+ * moves, and only the latest request matters (older ones are dropped).
+ */
+export class Previewer {
+  #worker: Worker | null = null;
+  #busy = false;
+  #pending: { job: Job; resolve: (r: JobDone | null) => void; reject: (e: JobError) => void } | null = null;
+
+  request(job: Job): Promise<JobDone | null> {
+    return new Promise((resolve, reject) => {
+      // A newer request supersedes the one still waiting.
+      this.#pending?.resolve(null);
+      this.#pending = { job, resolve, reject };
+      if (!this.#busy) this.#next();
+    });
+  }
+
+  #next() {
+    const p = this.#pending;
+    if (!p) return;
+    this.#pending = null;
+    this.#busy = true;
+    this.#worker ??= new Worker(scriptURL("./worker.js"), { type: "module", name: "pixvault-preview" });
+    const w = this.#worker;
+    const id = nextId++;
+    const done = () => {
+      this.#busy = false;
+      this.#next();
+    };
+    w.onmessage = (e: MessageEvent<JobMessage>) => {
+      const m = e.data;
+      if (m.id !== id || m.type === "progress") return;
+      if (m.type === "done") p.resolve(this.#pending ? null : { files: m.files, report: m.report, before: m.before });
+      else p.reject(new JobError(m.code, m.message));
+      done();
+    };
+    w.onerror = (e) => {
+      e.preventDefault();
+      this.#worker?.terminate();
+      this.#worker = null;
+      p.reject(new JobError("crash", e.message || "the preview stopped"));
+      done();
+    };
+    w.postMessage({ ...p.job, id } as JobRequest);
+  }
+
+  dispose() {
+    this.#worker?.terminate();
+    this.#worker = null;
+    this.#pending?.resolve(null);
+    this.#pending = null;
+    this.#busy = false;
+  }
+}
