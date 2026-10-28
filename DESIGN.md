@@ -12,7 +12,7 @@ colors:
   line-soft: "#e6e1d8"
   ink: "#22282d"
   ink-2: "#454d54"
-  muted: "#646b71"
+  muted: "#5c6369"
   box: "#566d7a"
   box-deep: "#435763"
   box-text: "#435763"
@@ -112,7 +112,7 @@ Colour is quarantined: the chrome is mat board, graphite and archival blue-grey,
 
 - **Mat board** (`ground`, `surface`, `surface-2`, `core`): warm greys and off-whites, like acid-free board. `surface` is the face of a mat; `core` the white core exposed by a bevel and the field of inputs.
 - **Archival box blue-grey** (`box`, `box-deep`, `box-text`): the shell bar, current navigation, links, icons, category headings — the colour of conservation storage boxes.
-- **Graphite** (`ink`, `ink-2`, `muted`): all text. `muted` passes 4.5:1 on `surface`.
+- **Graphite** (`ink`, `ink-2`, `muted`): all text. `muted` passes 4.5:1 on every light ground (4.85:1 on `ground`).
 - **Conservation red** (`red`, `red-deep`): reserved for what is about to happen or change — the primary run button, selection ticks, the before/after divider, drawn crop and redact areas, the drop target when files hover. Never decoration.
 - **States**: `gain` (smaller file), `loss` (bigger file), `gps`/`gps-soft` (a photo reveals its location; also risk panels), `error`, `focus`.
 - **Dark theme** follows the system: an archive at night — near-black board, deep blue-grey bar, warm off-white ink, a lighter red that keeps contrast.
