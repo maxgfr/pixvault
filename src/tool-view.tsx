@@ -3,7 +3,11 @@
 // settings on the right, ending with the one red button that runs it.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { modelFor } from "./ai/catalog.ts";
+import { useDownloaded, useWebGPU } from "./ai/download.ts";
 import { Compare } from "./compare.tsx";
+import { BrushEditor } from "./editors/brush-editor.tsx";
+import { ModelGate } from "./editors/model-gate.tsx";
 import { type PRect, RectEditor } from "./editors/rect-editor.tsx";
 import { parseRatio, ratioRect } from "./engine/ops/crop.ts";
 import { formatRegions, parseRegions } from "./engine/ops/redact.ts";
@@ -11,7 +15,7 @@ import { FieldList, missing } from "./fields.tsx";
 import { DropMat } from "./home.tsx";
 import { bytes, delta, errorText, photos as nPhotos, useLang } from "./i18n.ts";
 import { Icon } from "./icons.tsx";
-import { JobError, Previewer } from "./pool.ts";
+import { JobError, Previewer, runBatch } from "./pool.ts";
 import { Reports } from "./reports.tsx";
 import { Results } from "./results.tsx";
 import { useRunner } from "./run.ts";
@@ -33,11 +37,13 @@ interface PreviewState {
   error?: string;
 }
 
-function usePreview(tool: ToolDef, photo: Photo | undefined, options: Options): PreviewState {
+function usePreview(tool: ToolDef, photo: Photo | undefined, options: Options, modelReady: boolean): PreviewState {
   const previewer = useRef<Previewer | null>(null);
   const [state, setState] = useState<PreviewState>({ busy: false });
-  const kind = tool.step ? "step" : (tool.id === "compress" || tool.id === "convert") && tool.input === "image" ? "encode" : tool.editor ? "plain" : null;
-  const key = JSON.stringify(options, (_, v) => (v instanceof Uint8Array ? `bytes:${v.length}` : v));
+  // Upscaling is too slow to preview live; erase previews only its source.
+  const kind = tool.id === "upscale" || tool.id === "erase" ? "plain" : tool.step ? "step" : (tool.id === "compress" || tool.id === "convert") && tool.input === "image" ? "encode" : tool.editor ? "plain" : null;
+  // A plain preview shows the photo itself: settings (a painted mask…) must not reload it.
+  const key = kind === "plain" ? "" : JSON.stringify(options, (_, v) => (v instanceof Uint8Array ? `bytes:${v.length}` : v));
 
   useEffect(() => {
     previewer.current = new Previewer();
@@ -45,7 +51,7 @@ function usePreview(tool: ToolDef, photo: Photo | undefined, options: Options): 
   }, []);
 
   useEffect(() => {
-    if (!photo || !kind || tool.model) {
+    if (!photo || !kind || (tool.model && !modelReady && kind !== "plain")) {
       setState({ busy: false });
       return;
     }
@@ -85,7 +91,7 @@ function usePreview(tool: ToolDef, photo: Photo | undefined, options: Options): 
       // Keep the previous images on screen until the next ones arrive.
       setTimeout(() => urls.forEach((u) => URL.revokeObjectURL(u)), 4000);
     };
-  }, [photo?.key, photo?.bytes, kind, key, tool.id]);
+  }, [photo?.key, photo?.bytes, kind, key, tool.id, modelReady]);
   return state;
 }
 
@@ -98,7 +104,46 @@ export function ToolView({ tool }: { tool: ToolDef }) {
   const runner = useRunner();
   const fields = useMemo(() => [...tool.fields, ...(tool.output ? OUTPUT_FIELDS : [])], [tool]);
   const photo = sel.find((p) => p.key === focus) ?? sel[0];
-  const preview = usePreview(tool, runner.outcomes ? undefined : photo, options);
+  const webgpu = useWebGPU();
+  const modelId = tool.model ? modelFor(tool.id, options, webgpu ?? true) : null;
+  const haveModel = useDownloaded(modelId);
+  const modelReady = !modelId || haveModel === true;
+  const preview = usePreview(tool, runner.outcomes ? undefined : photo, options, modelReady);
+  const [asking, setAsking] = useState(false);
+  const viaApi = tool.id === "describe" && options.engine === "api";
+  // The provider code (AI SDK, llm-connect) loads only when someone picks it.
+  const [providerReady, setProviderReady] = useState(false);
+
+  useEffect(() => {
+    if (!viaApi) return;
+    void import("./ai/byok.ts").then(async (b) => {
+      await b.loadLlm();
+      setProviderReady(Boolean(b.savedSettings()));
+    });
+  }, [viaApi]);
+
+  /** "Describe" with the user's provider: the page asks it, then the worker writes the results. */
+  async function run() {
+    if (!viaApi) return runner.run({ tool, options }, sel);
+    setAsking(true);
+    try {
+      const { describeWithApi } = await import("./ai/byok.ts");
+      const small = await runBatch(
+        sel.map((p) => ({ kind: "preview" as const, steps: [], input: { name: p.name, bytes: p.bytes }, maxSide: 1024 })),
+        { workers: 2 },
+      );
+      const captions = new Map<string, string>();
+      for (const [i, p] of sel.entries()) {
+        const r = small[i];
+        if (!r || r instanceof JobError || !r.before) continue;
+        const d = await describeWithApi(r.before.bytes, options.detail === "long" ? "long" : "short", String(options.language ?? "auto"));
+        captions.set(p.key, JSON.stringify([d]));
+      }
+      await runner.run({ tool, options, perPhoto: (p) => ({ captions: captions.get(p.key) }) }, sel);
+    } finally {
+      setAsking(false);
+    }
+  }
 
   useEffect(() => {
     remembered.set(tool.id, options);
@@ -151,6 +196,10 @@ export function ToolView({ tool }: { tool: ToolDef }) {
                 </button>
               ) : null}
             </>
+          ) : modelId && haveModel === false ? (
+            <ModelGate id={modelId} />
+          ) : photo && tool.editor === "erase" && preview.before ? (
+            <BrushEditor src={preview.before} onMask={(m) => set("mask", m)} />
           ) : photo && (tool.editor === "crop" || tool.editor === "redact") && preview.before ? (
             <RectEditor
               src={preview.before}
@@ -164,7 +213,7 @@ export function ToolView({ tool }: { tool: ToolDef }) {
                 else if (rs[0]) setOptions((o) => ({ ...o, x: +rs[0]!.x.toFixed(2), y: +rs[0]!.y.toFixed(2), w: +rs[0]!.w.toFixed(2), h: +rs[0]!.h.toFixed(2) }));
               }}
             />
-          ) : photo && (preview.before || photo.thumb) && (tool.step || tool.id === "compress" || tool.id === "convert") ? (
+          ) : photo && (preview.before || photo.thumb) && (tool.step || tool.id === "compress" || tool.id === "convert") && tool.id !== "erase" ? (
             <div className="preview">
               <Compare before={preview.before ?? photo.thumb!} after={preview.after} alt={photo.name} />
               <p className="preview-line num" data-busy={preview.busy ? "" : undefined}>
@@ -176,7 +225,7 @@ export function ToolView({ tool }: { tool: ToolDef }) {
                     <span className={preview.size < photo.bytes.length ? "gain" : "loss"}>{delta(photo.bytes.length, preview.size, lang)}</span>
                   </>
                 ) : null}
-                {tool.model ? t("The preview appears once the model is on this device.", "L'aperçu apparaît une fois le modèle sur cet appareil.") : null}
+                {tool.id === "upscale" ? t("Upscaling runs tile by tile: it can take a few minutes without WebGPU.", "L'agrandissement se fait tuile par tuile : comptez quelques minutes sans WebGPU.") : null}
               </p>
             </div>
           ) : (
@@ -201,12 +250,19 @@ export function ToolView({ tool }: { tool: ToolDef }) {
                 </button>
               </>
             ) : (
-              <button type="button" className="primary run-button" disabled={!sel.length || lacking.length > 0 || Boolean(tooFew)} onClick={() => runner.run({ tool, options }, sel)}>
-                {label}
+              <button
+                type="button"
+                className="primary run-button"
+                disabled={!sel.length || lacking.length > 0 || Boolean(tooFew) || asking || (!modelReady && !viaApi) || (tool.id === "erase" && !options.mask) || (viaApi && !providerReady)}
+                onClick={() => void run()}
+              >
+                {asking ? t("Asking your AI provider…", "Interrogation de votre fournisseur d'IA…") : label}
               </button>
             )}
             <p className="note">
-              {!sel.length
+              {viaApi && !providerReady ? (
+                <a href="#/ai">{t("Set up your AI provider first", "Configurez d'abord votre fournisseur d'IA")}</a>
+              ) : !sel.length
                 ? t("Select at least one photo.", "Sélectionnez au moins une photo.")
                 : tooFew
                   ? t(`Select at least ${tool.min} photos.`, `Sélectionnez au moins ${tool.min} photos.`)

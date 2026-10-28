@@ -1,6 +1,7 @@
 // What report tools found, drawn from the data the engine returns.
 
 import { useState } from "react";
+import type { DescribeReport } from "./engine/run/ai.ts";
 import type { InspectReport, RiskCode } from "./engine/meta/read.ts";
 import type { Base64Report, DuplicatesReport, HistogramReport, PaletteReport } from "./engine/run/analyze.ts";
 import type { EditReport, StripReport } from "./engine/run/metadata.ts";
@@ -227,6 +228,37 @@ function Base64({ r }: { r: Base64Report }) {
   );
 }
 
+function Describe({ r }: { r: DescribeReport }) {
+  const { t } = useLang();
+  const [copied, setCopied] = useState(false);
+  return (
+    <article className="report-describe">
+      <h3>{r.name}</h3>
+      <p className="caption-text">{r.caption}</p>
+      {r.keywords.length ? (
+        <ul className="chips">
+          {r.keywords.map((k) => (
+            <li key={k} className="chip">
+              {k}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <button
+        type="button"
+        className="secondary small"
+        onClick={async () => {
+          await navigator.clipboard?.writeText(r.caption);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        }}
+      >
+        <Icon name="copy" size={16} /> {copied ? t("Copied", "Copié") : t("Copy the text", "Copier le texte")}
+      </button>
+    </article>
+  );
+}
+
 /** The report section for a finished run, when the tool has one worth showing. */
 export function Reports({ tool, outcomes, onSelectNames }: { tool: string; outcomes: Outcome[]; onSelectNames?: (names: string[]) => void }) {
   const { t } = useLang();
@@ -243,6 +275,8 @@ export function Reports({ tool, outcomes, onSelectNames }: { tool: string; outco
       return <div className="reports">{reportsOf<HistogramReport & { name: string }>(outcomes).map((r, i) => <Histogram key={i} r={r} />)}</div>;
     case "duplicates":
       return <div className="reports">{reportsOf<DuplicatesReport>(outcomes).map((r, i) => <Duplicates key={i} r={r} onSelect={onSelectNames} />)}</div>;
+    case "describe":
+      return <div className="reports">{reportsOf<DescribeReport>(outcomes).map((r, i) => <Describe key={i} r={r} />)}</div>;
     case "base64":
       return <div className="reports">{reportsOf<Base64Report>(outcomes).map((r, i) => <Base64 key={i} r={r} />)}</div>;
     case "strip": {

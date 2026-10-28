@@ -22,14 +22,14 @@ export interface Progress {
   label?: string;
 }
 
-export type Plan = { tool: ToolDef; options: Options } | { recipe: RecipeStep[]; output: Options };
+export type Plan = { tool: ToolDef; options: Options; perPhoto?: (p: Photo, i: number) => Options } | { recipe: RecipeStep[]; output: Options };
 
 const input = (p: Photo) => ({ name: p.name, bytes: p.bytes });
 
 function jobsFor(plan: Plan, photos: Photo[]): { job: Job; inputs: Photo[] }[] {
   if ("recipe" in plan) return photos.map((p) => ({ job: { kind: "recipe", steps: plan.recipe, output: plan.output, inputs: [input(p)] }, inputs: [p] }));
   if (plan.tool.input === "images") return [{ job: { kind: "tool", tool: plan.tool.id, inputs: photos.map(input), options: plan.options }, inputs: photos }];
-  return photos.map((p) => ({ job: { kind: "tool", tool: plan.tool.id, inputs: [input(p)], options: plan.options }, inputs: [p] }));
+  return photos.map((p, i) => ({ job: { kind: "tool", tool: plan.tool.id, inputs: [input(p)], options: { ...plan.options, ...plan.perPhoto?.(p, i) } }, inputs: [p] }));
 }
 
 export function useRunner() {

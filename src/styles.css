@@ -81,6 +81,7 @@
 }
 
 html {
+  caret-color: var(--red);
   -webkit-text-size-adjust: 100%;
   scrollbar-color: var(--line) transparent;
 }
@@ -228,6 +229,12 @@ a:hover {
   color: var(--muted);
 }
 
+.mat .label-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── Controls ─────────────────────────────────────────────────────── */
 
 button,
@@ -311,8 +318,10 @@ button.small,
 input[type="text"],
 input[type="search"],
 input[type="number"],
+input[type="password"],
 select,
 textarea {
+  max-width: 100%;
   font: inherit;
   font-size: 0.9375rem;
   color: var(--ink);
@@ -530,6 +539,14 @@ main:focus {
   height: 100%;
   object-fit: contain;
   background: var(--surface-2);
+}
+
+/* Transparent pixels show as the checkerboard every image tool uses for them. */
+.window img,
+.compare-frame img,
+.result-hero img,
+.brush-stage img {
+  background: repeating-conic-gradient(var(--surface-2) 0 25%, var(--core) 0 50%) 0 0 / 14px 14px;
 }
 
 .window-wait {
@@ -1831,6 +1848,7 @@ main:focus {
 /* Privacy. */
 .prose {
   max-width: 44rem;
+  min-width: 0;
   display: grid;
   gap: 1.75rem;
 }
@@ -1885,9 +1903,6 @@ main:focus {
   .options {
     position: static;
     max-height: none;
-  }
-  .workspace .actions {
-    order: -1;
   }
 }
 
@@ -1948,4 +1963,112 @@ main:focus {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ── AI ───────────────────────────────────────────────────────────── */
+
+.model-gate {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 0.75rem;
+  padding: 2.5rem 1.5rem;
+  background: var(--surface-2);
+  border: 8px solid;
+  border-color: var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);
+}
+
+.model-gate > .icon {
+  color: var(--box-text);
+}
+
+.model-gate h2 {
+  max-width: 30ch;
+}
+
+.model-gate p {
+  max-width: 56ch;
+}
+
+.model-gate .progress {
+  width: min(24rem, 100%);
+}
+
+.brush-editor {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.brush-stage {
+  position: relative;
+  display: grid;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  border: 6px solid;
+  border-color: var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);
+}
+
+.brush-stage img,
+.brush-stage canvas {
+  grid-area: 1 / 1;
+  max-height: 64dvh;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+}
+
+.brush-stage canvas {
+  width: 100%;
+  height: 100%;
+  opacity: 0.55;
+  mix-blend-mode: normal;
+  filter: drop-shadow(0 0 0 var(--red)) sepia(1) saturate(8) hue-rotate(-30deg);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.brush-size {
+  grid-template-columns: auto 10rem;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.report-describe {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.caption-text {
+  font-size: 1.0625rem;
+  max-width: 65ch;
+}
+
+.model-rows {
+  list-style: none;
+  padding: 0 !important;
+  display: grid;
+  gap: 0 !important;
+}
+
+.model-row > div:first-child {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.model-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.provider {
+  display: grid;
+  gap: 0.85rem;
+  padding-top: 1rem;
+  border-top: 2px solid var(--ink);
 }

@@ -4,6 +4,7 @@
 import { createHash } from "node:crypto";
 import { cp, mkdir, readdir, rm, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
+import { MODELS } from "../src/ai/catalog.ts";
 import { WASM } from "../src/engine/wasm.ts";
 
 const root = new URL("../", import.meta.url).pathname;
@@ -34,7 +35,7 @@ check(
     entrypoints: [`${root}index.html`],
     outdir: dist,
     minify: true,
-    publicPath: "./",
+    splitting: true,
     naming: { entry: "[name].[ext]", chunk: "assets/[name]-[hash].[ext]", asset: "assets/[name]-[hash].[ext]" },
     define: { "process.env.NODE_ENV": '"production"' },
   }),
@@ -55,6 +56,19 @@ check(
 
 await mkdir(`${dist}/wasm`, { recursive: true });
 for (const [name, path] of Object.entries(WASM)) await cp(`${root}node_modules/${path}`, `${dist}/wasm/${name}.wasm`);
+
+// ONNX Runtime's WebGPU build for the AI tools, served from here, never from a CDN.
+await mkdir(`${dist}/ort`, { recursive: true });
+for (const ext of ["mjs", "wasm"]) await cp(`${root}node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.${ext}`, `${dist}/ort/ort-wasm-simd-threaded.asyncify.${ext}`);
+// The models this site serves (scripts/fetch-models.ts), downloaded by users only on request.
+for (const m of Object.values(MODELS)) {
+  if (m.host !== "site") continue;
+  await mkdir(`${dist}/models/${m.id}`, { recursive: true });
+  for (const f of m.files) {
+    const name = f.path.split("/").pop()!;
+    await cp(`${root}models/${m.id}/${name}`, `${dist}/models/${m.id}/${name}`);
+  }
+}
 
 await cp(`${root}public`, dist, { recursive: true });
 // Links to files under public/ are added after bundling: the HTML bundler

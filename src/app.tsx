@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { takeShared } from "./files.ts";
 import { Home, usePaste } from "./home.tsx";
 import { setLang, useLang } from "./i18n.ts";
@@ -8,6 +8,9 @@ import { RecipePage } from "./recipe.tsx";
 import { ToolView } from "./tool-view.tsx";
 import { toolById } from "./tools/index.ts";
 import { usePhotos, workspace } from "./workspace.ts";
+
+// The AI settings page carries the provider SDKs: loaded only when opened.
+const AiPage = lazy(() => import("./ai-page.tsx").then((m) => ({ default: m.AiPage })));
 
 function useRoute(): string {
   const get = () => location.hash.replace(/^#\/?/, "").split("?")[0] ?? "";
@@ -45,7 +48,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const name = tool ? l(tool.title) : route === "privacy" ? t("Privacy", "Confidentialité") : route === "recipe" ? t("Recipe", "Recette") : "";
+    const name = tool ? l(tool.title) : route === "privacy" ? t("Privacy", "Confidentialité") : route === "recipe" ? t("Recipe", "Recette") : route === "ai" ? t("AI", "IA") : "";
     document.title = name ? `${name} · pixvault` : t("pixvault: private photo tools", "pixvault : outils photo privés");
   }, [tool, route, lang]);
 
@@ -71,6 +74,9 @@ export function App() {
           <a href="#/recipe" aria-current={route === "recipe" ? "page" : undefined}>
             <Icon name="layers" size={18} /> <span className="nav-label">{t("Recipes", "Recettes")}</span>
           </a>
+          <a href="#/ai" aria-current={route === "ai" ? "page" : undefined}>
+            <Icon name="ai" size={18} /> <span className="nav-label">{t("AI", "IA")}</span>
+          </a>
           <a href="#/privacy" aria-current={route === "privacy" ? "page" : undefined}>
             <Icon name="shield" size={18} /> <span className="nav-label">{t("Privacy", "Confidentialité")}</span>
           </a>
@@ -85,7 +91,13 @@ export function App() {
         </nav>
       </header>
       <main id="main" tabIndex={-1}>
-        {tool ? <ToolView key={tool.id} tool={tool} /> : route === "privacy" ? <Privacy /> : route === "recipe" ? <RecipePage /> : <Home />}
+        {tool ? <ToolView key={tool.id} tool={tool} /> : route === "privacy" ? <Privacy /> : route === "recipe" ? <RecipePage /> : route === "ai" ? (
+          <Suspense fallback={<p className="note">…</p>}>
+            <AiPage />
+          </Suspense>
+        ) : (
+          <Home />
+        )}
       </main>
       <footer className="foot">
         <p>
