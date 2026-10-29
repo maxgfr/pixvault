@@ -127,3 +127,23 @@ test("stopping a batch leaves the app ready to run again", async ({ page }) => {
   await expect(results.locator(".error-text")).toHaveCount(0);
   await w.assertClean();
 });
+
+test("the before/after divider follows a drag started anywhere on the picture", async ({ page }) => {
+  const w = await watch(page);
+  await drop(page, ["crew.jpg"]);
+  await page.goto("./#/compress");
+  const frame = page.locator(".compare-live");
+  await expect(frame).toBeVisible({ timeout: 30_000 });
+  const at = () => frame.evaluate((el) => parseFloat((el as HTMLElement).style.getPropertyValue("--at")));
+  const box = (await frame.locator("img").first().boundingBox())!;
+  // From the middle of the picture (the round handle), well below any native slider track.
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height * 0.6);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.8, { steps: 5 });
+  await page.mouse.up();
+  expect(await at()).toBeCloseTo(20, 0);
+  // And the keyboard still moves it.
+  await page.keyboard.press("ArrowRight");
+  expect(await at()).toBeGreaterThan(20);
+  await w.assertClean();
+});

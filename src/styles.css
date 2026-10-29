@@ -1343,14 +1343,24 @@ main:focus {
   box-shadow: var(--shadow-mat);
 }
 
-.compare-handle {
+/* Dragging works from anywhere on the picture (compare.tsx); vertical swipes still scroll on touch screens. */
+.compare-live {
+  cursor: ew-resize;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* The range input stays for the keyboard and screen readers, invisible and out of the pointer's way
+   (two classes: the base input[type="range"] rule must not give it its height back). */
+.compare-frame .compare-handle {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   margin: 0;
   opacity: 0;
-  cursor: ew-resize;
+  pointer-events: none;
 }
 
 .compare-frame:has(.compare-handle:focus-visible) .compare-divider::after {
