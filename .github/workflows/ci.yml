@@ -1,8 +1,9 @@
 name: CI
 
 # Every gate on every push: tsc, oxlint, bun test, the site build and its
-# no-network check, Playwright end to end, the compiled CLI against its own
-# tests, and osv-scanner. The site artifact built here is what Pages deploys.
+# no-network check, Playwright end to end, each compiled CLI binary (macOS
+# and Linux, arm64 and x64) against the CLI tests, and osv-scanner. The site
+# artifact built here is what Pages deploys.
 
 on:
   push:
@@ -52,8 +53,17 @@ jobs:
           retention-days: 7
 
   cli:
-    name: Command line (compiled binary)
-    runs-on: ubuntu-latest
+    name: Command line (${{ matrix.target }} binary)
+    # Every binary the release ships runs the whole CLI suite on its own platform.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, target: linux-x64 }
+          - { runner: ubuntu-24.04-arm, target: linux-arm64 }
+          - { runner: macos-latest, target: macos-arm64 }
+          - { runner: macos-15-intel, target: macos-x64 }
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -63,11 +73,11 @@ jobs:
           path: models
           key: models-${{ hashFiles('scripts/fetch-models.ts', 'src/ai/catalog.ts') }}
       - run: bun run fetch-models
-      - run: bun scripts/cli-binaries.ts linux-x64
+      - run: bun scripts/cli-binaries.ts ${{ matrix.target }}
       - name: The CLI tests, run by the binary itself
         run: bun test src/cli
         env:
-          PIXVAULT_BIN: dist-cli/pixvault-linux-x64
+          PIXVAULT_BIN: dist-cli/pixvault-${{ matrix.target }}
 
   osv:
     name: Known vulnerabilities (osv-scanner)
