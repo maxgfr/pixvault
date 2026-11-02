@@ -61,6 +61,16 @@ async function receiveShared(req: Request): Promise<Response> {
   return Response.redirect(abs("./#/?shared"), 303);
 }
 
+/** A previous version's copy. Never caches.match(): the origin's Cache Storage is shared by every maxgfr.github.io page. */
+async function ownMatch(key: string): Promise<Response | undefined> {
+  for (const name of await caches.keys()) {
+    if (!name.startsWith("pixvault-")) continue;
+    const hit = await (await caches.open(name)).match(key);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
 sw.addEventListener("fetch", (event: FetchEvent) => {
   const req = event.request;
   const url = new URL(req.url);
@@ -75,7 +85,7 @@ sw.addEventListener("fetch", (event: FetchEvent) => {
     (async () => {
       const cache = await caches.open(CACHE);
       // This version first, then the previous one (for tabs still running it).
-      const hit = (await cache.match(key)) ?? (req.mode === "navigate" ? undefined : await caches.match(key));
+      const hit = (await cache.match(key)) ?? (req.mode === "navigate" ? undefined : await ownMatch(key));
       if (hit) return hit;
       const res = await fetch(req);
       if (res.ok && (lazySet.has(key) || key === abs("./"))) await cache.put(key, res.clone());
