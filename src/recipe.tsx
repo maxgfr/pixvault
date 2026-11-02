@@ -45,7 +45,8 @@ const STARTERS: Recipe[] = [
 
 function load(): Recipe[] {
   try {
-    return JSON.parse(localStorage.getItem(KEY) ?? "[]") as Recipe[];
+    const saved: unknown = JSON.parse(localStorage.getItem(KEY) ?? "[]");
+    return Array.isArray(saved) ? (saved as Recipe[]) : [];
   } catch {
     return [];
   }
@@ -73,7 +74,16 @@ export function RecipePage() {
   });
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => localStorage.setItem(KEY, JSON.stringify(saved)), [saved]);
+  // One localStorage for every page of maxgfr.github.io: another site can fill it.
+  const [unsaved, setUnsaved] = useState(false);
+  useEffect(() => {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(saved));
+      setUnsaved(false);
+    } catch {
+      setUnsaved(true);
+    }
+  }, [saved]);
 
   const setStep = (i: number, s: Step) => setRecipe((r) => ({ ...r, steps: r.steps.map((x, j) => (j === i ? s : x)) }));
   const moveStep = (i: number, by: number) =>
@@ -174,6 +184,14 @@ export function RecipePage() {
                 <Icon name="copy" size={16} /> {copied ? t("Link copied", "Lien copié") : t("Copy a link", "Copier un lien")}
               </button>
             </div>
+            {unsaved ? (
+              <p className="error-text" role="alert">
+                {t(
+                  "This site's storage in your browser is full or blocked: your recipes are kept for this page only, gone after a reload.",
+                  "Le stockage de ce site dans votre navigateur est plein ou bloqué : vos recettes sont gardées pour cette page seulement, perdues au rechargement.",
+                )}
+              </p>
+            ) : null}
             <ul className="saved-recipes">
               {[...STARTERS, ...saved].map((r) => (
                 <li key={r.name}>

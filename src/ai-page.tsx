@@ -128,7 +128,16 @@ function Provider() {
           disabled={!s.canSave}
           onClick={async () => {
             const r = await llm.save();
-            setStatus(r.ok ? t("Saved.", "Enregistré.") : t("Some settings are missing or invalid.", "Des réglages manquent ou sont invalides."));
+            setStatus(
+              !r.ok
+                ? t("Some settings are missing or invalid.", "Des réglages manquent ou sont invalides.")
+                : r.persisted
+                  ? t("Saved.", "Enregistré.")
+                  : t(
+                      "This site's storage in your browser is full or blocked: kept for this page only, gone after a reload.",
+                      "Le stockage de ce site dans votre navigateur est plein ou bloqué : gardé pour cette page seulement, perdu au rechargement.",
+                    ),
+            );
           }}
         >
           {t("Save", "Enregistrer")}

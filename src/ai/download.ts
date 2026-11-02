@@ -54,7 +54,12 @@ export async function download(id: ModelId, onProgress: (done: number, total: nu
       onProgress(done + at, total);
     }
     if (at !== f.bytes || (await sha256(buf)) !== f.sha256) throw new DownloadError("the file does not match its fingerprint");
-    await cache.put(key, new Response(buf, { headers: { "content-type": "application/octet-stream" } }));
+    try {
+      await cache.put(key, new Response(buf, { headers: { "content-type": "application/octet-stream" } }));
+    } catch {
+      // Every page of maxgfr.github.io shares this origin's quota.
+      throw new DownloadError("this site's storage in your browser is full");
+    }
     done += f.bytes;
   }
   changed();

@@ -74,6 +74,21 @@ test("a recipe chains steps and writes WebP", async ({ page }) => {
   await w.assertClean();
 });
 
+test("a full storage (every maxgfr.github.io page shares it): recipes still work and say they will not last", async ({ page }) => {
+  const w = await watch(page);
+  await page.addInitScript(() => {
+    Storage.prototype.setItem = () => {
+      throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+    };
+  });
+  await page.goto("./#/recipe");
+  await page.getByLabel("Recipe name").fill("Mine");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("kept for this page only");
+  await expect(page.getByRole("button", { name: "Mine", exact: true })).toBeVisible();
+  await w.assertClean();
+});
+
 test("a collage of several photos", async ({ page }) => {
   const w = await watch(page);
   await drop(page, ["gps.jpg", "plain.jpg"]);
